@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="/style.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- ===== LOGIN GATE ===== -->
+    <div id="loginGate" class="login-gate">
+        <div class="login-card">
+            <h2>Iniciar sesión</h2>
+            <p class="login-muted">Acceso restringido</p>
+
+            <label class="login-label" for="loginUser">Usuario</label>
+            <input id="loginUser" class="login-input" type="text" autocomplete="off" />
+
+            <label class="login-label" for="loginPass">Contraseña</label>
+
+            <div class="password-wrapper">
+                <input id="loginPass" class="login-input" type="password" autocomplete="current-password" />
+
+                <button type="button" id="togglePass" class="toggle-pass" aria-label="Mostrar contraseña"
+                    data-visible="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                        fill="#1f1f1f">
+                        <path
+                            d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Z" />
+                    </svg>
+                </button>
+            </div>
+
+            <div id="loginError" class="login-error"></div>
+
+            <button id="btnLogin" class="login-btn">Entrar</button>
+
+            <div class="login-foot">
+                <button id="btnLogout" class="login-link oculto" type="button">Cerrar sesión</button>
+                <span id="loginInfo" class="login-muted"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-layout" id="appRoot">
+
+        <!-- ===== SIDEBAR ===== -->
+        <aside class="sidebar">
+            <h2 class="logo"><a href="index.html"><img src="/img/logo,png.png" alt="" style="width: 80px;"></a></h2>
+
+            <div class="menu-section">
+                <p class="menu-title">INFORMES</p>
+
+                <button class="menu-btn" id="btnDashboard">
+                    <svg class="menu-icon" viewBox="0 -960 960 960">
+                        <path
+                            d="M120-120v-720h720v720H120Zm80-80h120v-200H200v200Zm200 0h120v-360H400v360Zm200 0h120v-520H600v520Z" />
+                    </svg>
+                    <span>Dashboard</span>
+                </button>
+
+                <button class="menu-btn" id="btnReportes">
+                    <svg class="menu-icon" viewBox="0 -960 960 960">
+                        <path
+                            d="M120-120v-720h720v720H120Zm80-80h120v-200H200v200Zm200 0h120v-360H400v360Zm200 0h120v-520H600v520Z" />
+                    </svg>
+                    <span>Reportes</span>
+                </button>
+
+            </div>
+
+            <div class="menu-section">
+                <p class="menu-title">FINANZAS</p>
+
+                <button id="btnVentas" class="menu-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                        fill="#1f1f1f">
+                        <path
+                            d="M280-80q-33 0-56.5-23.5T200-160q0-33 23.5-56.5T280-240q33 0 56.5 23.5T360-160q0 33-23.5 56.5T280-80Zm400 0q-33 0-56.5-23.5T600-160q0-33 23.5-56.5T680-240q33 0 56.5 23.5T760-160q0 33-23.5 56.5T680-80ZM246-720l96 200h280l110-200H246Zm-38-80h590q23 0 35 20.5t1 41.5L692-482q-11 20-29.5 31T622-440H324l-44 80h480v80H280q-45 0-68-39.5t-2-78.5l54-98-144-304H40v-80h130l38 80Zm134 280h280-280Z" />
+                    </svg>
+                    <span>Registrar Ventas</span>
+                </button>
+
+                <button class="menu-btn" id="btnCaja">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                        fill="#1f1f1f">
+                        <path
+                            d="M336-120q-91 0-153.5-62.5T120-336q0-38 13-74t37-65l142-171-97-194h530l-97 194 142 171q24 29 37 65t13 74q0 91-63 153.5T624-120H336Zm144-200q-33 0-56.5-23.5T400-400q0-33 23.5-56.5T480-480q33 0 56.5 23.5T560-400q0 33-23.5 56.5T480-320Zm-95-360h190l40-80H345l40 80Zm-49 480h288q57 0 96.5-39.5T760-336q0-24-8.5-46.5T728-423L581-600H380L232-424q-15 18-23.5 41t-8.5 47q0 57 39.5 96.5T336-200Z" />
+                    </svg>
+                    <span>Ingresos y Egresos</span>
+                </button>
+            </div>
+
+            <div class="menu-section">
+                <p class="menu-title">STOCK</p>
+
+                <button id="btnVerProductos" class="menu-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                        fill="#1f1f1f">
+                        <path
+                            d="M120-160q-17 0-28.5-11.5T80-200q0-10 4-18.5T96-232l344-258v-70q0-17 12-28.5t29-11.5q25 0 42-18t17-43q0-25-17.5-42T480-720q-25 0-42.5 17.5T420-660h-80q0-58 41-99t99-41q58 0 99 40.5t41 98.5q0 47-27.5 84T520-526v36l344 258q8 5 12 13.5t4 18.5q0 17-11.5 28.5T840-160H120Zm120-80h480L480-420 240-240Z" />
+                    </svg>
+                    <span>Productos</span>
+                </button>
+
+
+
+                <button class="menu-btn" id="btnCompras">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                        fill="#1f1f1f">
+                        <path
+                            d="M440-600v-120H320v-80h120v-120h80v120h120v80H520v120h-80ZM280-80q-33 0-56.5-23.5T200-160q0-33 23.5-56.5T280-240q33 0 56.5 23.5T360-160q0 33-23.5 56.5T280-80Zm400 0q-33 0-56.5-23.5T600-160q0-33 23.5-56.5T680-240q33 0 56.5 23.5T760-160q0 33-23.5 56.5T680-80ZM40-800v-80h131l170 360h280l156-280h91L692-482q-11 20-29.5 31T622-440H324l-44 80h480v80H280q-45 0-68.5-39t-1.5-79l54-98-144-304H40Z" />
+                    </svg>
+                    <span>Compras</span>
+                </button>
+            </div>
+        </aside>
+
+
+        <!-- ===== CONTENIDO ===== -->
+        <main class="main-content">
+
+            <!-- ================= BARRA SUPERIOR ================= -->
+            <div class="barra-superior">
+                <div class="acciones">
+                    <button id="btnAgregarProducto"></button>
+                    <button id="btnVerProductos"></button>
+                    <button id="btnVentas"></button>
+                </div>
+
+                <div class="barra-buscador">
+                    <input id="inputBuscar" type="text" placeholder="Buscar producto..." class="buscador"
+                        autocomplete="off">
+                    <ul id="sugerenciasBuscar" class="sugerencias oculto"></ul>
+
+                    <!-- Botón filtro categorías -->
+                    <div class="filtro-categorias-wrapper">
+                        <button id="btnFiltroCategorias">Filtrar Categoría ▼</button>
+                        <ul id="listaCategorias" class="sugerencias oculto"></ul>
+                    </div>
+                </div>
+
+            </div>
+
+
+
+            <!-- ================= MODAL PRODUCTO ================= -->
+            <div id="modalProducto" class="modal oculto">
+                <div class="modal-contenido">
+                    <h2 id="tituloModal">Agregar Producto</h2>
+
+                    <input id="inputId" type="text" placeholder="ID" disabled>
+                    <span class="error" id="errorId"></span>
+
+                    <input id="inputNombre" type="text" placeholder="Nombre" autocomplete="off">
+                    <span class="error" id="errorNombre"></span>
+
+                    <input id="inputPrecio" type="number" placeholder="Precio de venta" autocomplete="off">
+                    <span class="error" id="errorPrecio"></span>
+
+                    <input id="inputPrecioCompraa" type="number" placeholder="Precio de compra" autocomplete="off">
+                    <span class="error" id="errorPrecioCompra"></span>
+
+                    <div class="buscador-wrapper">
+                        <input id="inputCategoria" type="text" placeholder="Categoría" autocomplete="off">
+
+                        <ul id="sugerenciasCategorias" class="sugerencias oculto"></ul>
+                    </div>
+                    <span class="error" id="errorCategoria"></span>
+
+                    <div id="stockTallesWrapper">
+                        <label>Stock inicial:</label>
+                        <div class="input-talles">
+                            <input type="number" id="stockS" placeholder="S" min="0" autocomplete="off">
+                            <input type="number" id="stockM" placeholder="M" min="0" autocomplete="off">
+                            <input type="number" id="stockL" placeholder="L" min="0" autocomplete="off">
+                            <input type="number" id="stockXL" placeholder="XL" min="0" autocomplete="off">
+                        </div>
+                    </div>
+
+                    <div class="modal-botones">
+                        <button id="btnGuardar">Guardar</button>
+                        <button id="btnCancelar">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= MODAL STOCK ================= -->
+            <div id="modalStock" class="modal oculto">
+                <div class="modal-contenido">
+                    <h2>Agregar Stock</h2>
+                    <p id="stockInfo"></p>
+                    <input id="inputCantidadStock" type="number" placeholder="Cantidad a agregar">
+                    <span class="error" id="errorStock"></span>
+                    <div class="modal-botones">
+                        <button id="btnConfirmarStock">Confirmar</button>
+                        <button id="btnCancelarStock">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SECCION COMPRAS ================= -->
+            <section id="seccionCompras" class="seccion oculto" style="width: 820px; padding: 0px;margin-left: 250px; ">
+
+
+                <!-- Contenedor estilo tarjeta como registro de venta -->
+                <div
+                    style="background: #ffffff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 30px ; margin: 10px 20px; max-width: 500px;">
+                    <h2 style="margin-bottom: 15px;margin-top: 0px; text-align: center;color: #21252d;">Registrar
+                        Compra
+                    </h2>
+
+
+
+                    <!-- Producto -->
+                    <div class="buscador-wrapper" style="margin-bottom: 0px; margin-top: 10px;">
+                        <input id="inputProductoCompra" type="text" placeholder="Producto..." autocomplete="off"
+                            style="padding: 10px; width: 100%; border: 1px solid #ccc; border-radius: 5px; margin-top: 8px; ">
+                        <ul id="sugerenciasProductosCompra" class="sugerencias oculto"></ul>
+
+                        <button id="btnAgregarProductoCompra" class="btn-primary"
+                            style="padding-right: 10px; margin-top: 10px; padding-bottom: 7px; padding-top: 7px; cursor: pointer;">+Nuevo</button>
+                    </div>
+
+
+                    <!-- Cantidades por talle -->
+                    <div class="form-group" style="margin-bottom: 15px; margin-top: 15px;">
+                        <label style="font-weight: bold; color: #21252d; display:block; margin-bottom: 5px;">Cantidad
+                            por talle:</label>
+                        <input type="number" id="compraS" placeholder="S" min="0"
+                            style="width: 60px; padding: 8px; margin-right: 5px; border: 1px solid #ccc; border-radius: 5px;">
+                        <input type="number" id="compraM" placeholder="M" min="0"
+                            style="width: 60px; padding: 8px; margin-right: 5px; border: 1px solid #ccc; border-radius: 5px;">
+                        <input type="number" id="compraL" placeholder="L" min="0"
+                            style="width: 60px; padding: 8px; margin-right: 5px; border: 1px solid #ccc; border-radius: 5px;">
+                        <input type="number" id="compraXL" placeholder="XL" min="0"
+                            style="width: 60px; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                    </div>
+                    <button id="btnAgregarCompra" class="btn-primary"
+                        style="padding-right: 10px; margin-top: 3px; margin-bottom: 8px; padding-bottom: 7px; padding-top: 7px; cursor: pointer;">Agregar
+                        producto</button>
+
+                    <table class="tabla-productos">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Talle</th>
+                                <th>Cantidad</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resumenCompra"></tbody>
+                    </table>
+
+                    <!-- Precio total -->
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="font-weight: bold; color: #21252d; display:block; margin-bottom: 5px;">Precio
+                            total de la compra:</label>
+                        <input type="number" id="precioCompra" placeholder="$"
+                            style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+                    </div>
+
+                    <!-- Botón registrar -->
+                    <div style="text-align: center; margin-top: 10px;">
+                        <button id="btnGuardarCompra" class="btn-primary" style="padding: 10px 20px;">Registrar
+                            Compra</button>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- ================= LISTA DE PRODUCTOS ================= -->
+            <section id="seccionProductos" class="oculto">
+
+                <div class="barra-productos">
+                    <button id="btnAbrirModalProducto" class="btn-primary" style="cursor: pointer;;"> +
+                        Nuevo</button>
+                </div>
+
+                <h2 style="margin: 10px; margin-left: 0; color: #21252d;">Lista de productos</h2>
+
+                <div class="productos-header" style="color: #21252d;">
+                    <div>ID</div>
+                    <div>Nombre</div>
+                    <div>Precio venta</div>
+                    <div>Precio compra</div>
+                    <div>Categoría</div>
+                    <div>Talles</div>
+                    <div>Acciones</div>
+                </div>
+
+                <div id="listaProductos" class="productos-container"></div>
+
+            </section>
+
+
+            <!-- ================= SECCIÓN VENTAS ================= -->
+            <section id="seccionVentas" class="oculto">
+                <div class="ventas-card">
+                    <div class="ventas-panel">
+
+                        <h2>Registrar Venta</h2>
+
+                        <div class="form-group cliente">
+                            <input id="inputCliente" type="text" placeholder="Nombre del cliente" autocomplete="off">
+                            <input id="inputEmail" type="email" placeholder="Email del cliente" autocomplete="off">
+                            <input id="inputTelefono" type="tel" placeholder="Teléfono" autocomplete="off">
+                            <input id="inputAds" type="text" placeholder="Dni" autocomplete="off">
+                        </div>
+
+                        <div class="producto-buscador">
+                            <div class="buscador-wrapper">
+                                <input type="text" id="inputBuscarVenta" placeholder="Buscar producto"
+                                    autocomplete="off">
+                                <ul id="sugerenciasVenta" class="sugerencias oculto"></ul>
+                            </div>
+                            <select id="selectTalle">
+                                <option value="">Elegir talle</option>
+                            </select>
+                            <input id="inputCantidadProducto" type="number" placeholder="Cantidad" min="1">
+                            <button id="btnAgregarAlCarrito" class="btn-primary">Agregar al carrito</button>
+                        </div>
+
+                        <h3>Productos en la venta</h3>
+                        <div id="carritoVenta" class="carrito-container">
+                        </div>
+                        <div class="form-group pago">
+                            <label>Forma de pago:</label>
+                            <select id="selectPago">
+                                <option value="efectivo">Efectivo</option>
+                                <option value="transferencia">Transferencia</option>
+                                <option value="tarjeta-credito">Tarjeta de crédito</option>
+                                <option value="tarjeta-debito">Tarjeta de débito</option>
+                            </select>
+                            <div id="contenedorBanco"></div>
+                            <input id="inputCuotas" type="number" placeholder="Cuotas" min="1" value="1" class="oculto">
+                        </div>
+
+                        <div class="form-group totales">
+                            <input id="inputDescuento" type="number" placeholder="Descuento (%)" min="0" max="100">
+                            <p>Subtotal:
+                                $<span id="subtotalVenta"> 0</span></p>
+                            <p>
+                                Total: $<span id="totalVenta"> 0</span></p>
+                        </div>
+
+                        <button id="btnConfirmarVenta" class="btn-primary">Registrar
+                            venta</button>
+                    </div>
+            </section>
+
+
+            <!-- Botón flotante para calculadora -->
+            <button id="btnCalculadora" style="position:fixed; bottom:20px; right:20px; z-index:9999;"><svg
+                    xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                    fill="#1f1f1f">
+                    <path
+                        d="M320-240h60v-80h80v-60h-80v-80h-60v80h-80v60h80v80Zm200-30h200v-60H520v60Zm0-100h200v-60H520v60Zm44-152 56-56 56 56 42-42-56-58 56-56-42-42-56 56-56-56-42 42 56 56-56 58 42 42Zm-314-70h200v-60H250v60Zm-50 472q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z" />
+                </svg></button>
+
+            <!-- Calculadora flotante -->
+            <div id="calculadora" class="oculto">
+                <div id="calcHeader" style="font-size: 30px; color: #21252d;">Calculadora</div>
+                <input type="text" id="calcDisplay" readonly>
+                <div class="calc-buttons">
+                    <button>7</button><button>8</button><button>9</button><button style="color: #ffffff;">/</button>
+                    <button>4</button><button>5</button><button>6</button><button style="color: #ffffff;">x</button>
+                    <button>1</button><button>2</button><button>3</button><button style="color: #ffffff;">-</button>
+                    <button>0</button><button id="btnClear">C</button><button>=</button><button
+                        style="color: #ffffff;">+</button>
+                </div>
+            </div>
+
+            <!-- ================= SECCIÓN CAJA (SIN JINJA, SOLO HTML) ================= -->
+            <section id="seccionCaja" class="seccion oculto">
+
+                <div class="page-head">
+                    <div>
+                        <h2 class="page-title">Caja</h2>
+                        <div class="small-muted">Apertura/cierre + movimientos. Las ventas se registran acá
+                            automáticamente.</div>
+                    </div>
+                </div>
+                <button id="btnResetCaja" class="btn-primary">
+                    Resetear
+                </button>
+
+                <!-- Caja ABIERTA -->
+                <div id="cajaAbiertaUI" class="oculto">
+                    <div class="grid-caja">
+                        <div class="col-left">
+
+                            <div class="card soft-card">
+                                <div class="card-body">
+                                    <div class="card-head">
+                                        <h5 class="card-title">Estado</h5>
+                                        <span class="badge badge-success">ABIERTA</span>
+                                    </div>
+
+                                    <hr class="divider">
+
+                                    <div class="small-muted">Caja ID: <b id="cajaIdTxt">-</b></div>
+                                    <div class="small-muted">Abierta en: <b id="cajaAbiertaEnTxt">-</b></div>
+
+                                    <div class="row-between mt-12">
+                                        <span class="small-muted">Saldo esperado</span>
+                                        <span class="money">$<span id="saldoEsperadoTxt">0</span></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card soft-card mt-16">
+                                <div class="card-body">
+                                    <h5 class="card-title">Movimiento manual</h5>
+                                    <div class="small-muted mb-10">Ingreso o egreso fuera de ventas (ej: compra de
+                                        insumos).</div>
+
+                                    <form id="formMovCaja" class="form-stack">
+                                        <div class="field">
+                                            <label class="form-label">Tipo</label>
+                                            <select class="input" id="movTipo">
+                                                <option value="INGRESO">Ingreso</option>
+                                                <option value="EGRESO">Egreso</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <label class="form-label">Medio de pago</label>
+                                            <select class="input" id="movMedioPago" required>
+                                                <option value="EFECTIVO">Efectivo</option>
+                                                <option value="DEBITO">Tarjeta Débito</option>
+                                                <option value="CREDITO">Tarjeta Crédito</option>
+                                                <option value="TRANSFERENCIA">Transferencia</option>
+                                                <option value="QR">QR</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
+                                            <label class="form-label">Descripción</label>
+                                            <input class="input" id="movDesc" placeholder="Ej: Compra bolsas">
+                                        </div>
+
+                                        <div class="field">
+                                            <label class="form-label">Monto</label>
+                                            <input class="input" id="movMonto" type="number" step="0.01"
+                                                placeholder="Ej: 1500" required>
+                                        </div>
+
+                                        <button class="btn btn-dark" type="submit">Registrar movimiento</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <div class="card soft-card mt-16">
+                                <div class="card-body">
+                                    <h5 class="card-title">Cerrar caja</h5>
+
+                                    <form id="formCerrarCaja" class="form-stack">
+                                        <div class="field">
+                                            <label class="form-label">Monto contado al cierre</label>
+                                            <input class="input" id="cierreContado" type="number" step="0.01" required>
+                                        </div>
+
+                                        <div class="field">
+                                            <label class="form-label">Observación</label>
+                                            <input class="input" id="cierreObs" placeholder="(opcional)">
+                                        </div>
+
+                                        <button class="btn btn-danger-outline" type="submit">Cerrar</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="col-right">
+                            <div class="card soft-card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Últimos movimientos (máx 50)</h5>
+                                    <div class="small-muted mb-10">Incluye ventas automáticas + ingresos/egresos
+                                        manuales.</div>
+
+                                    <div class="table-wrap">
+                                        <table class="table-soft">
+                                            <thead>
+                                                <tr>
+                                                    <th>Fecha</th>
+                                                    <th>Tipo</th>
+                                                    <th>Desc</th>
+                                                    <th class="text-end">Monto</th>
+                                                    <th>Pago</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="tablaMovimientosBody">
+                                                <tr>
+                                                    <td colspan="5" class="text-center small-muted"
+                                                        style="padding:18px;">
+                                                        Sin movimientos todavía.
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Caja CERRADA -->
+                <div id="cajaCerradaUI">
+                    <div class="center-card">
+                        <div class="card soft-card">
+                            <div class="card-body">
+                                <div class="card-head">
+                                    <h5 class="card-title">Caja cerrada</h5>
+                                    <span class="badge badge-gray">CERRADA</span>
+                                </div>
+
+                                <hr class="divider">
+
+                                <div id="alertDiferencia" class="alert-soft oculto"></div>
+
+                                <form id="formAbrirCaja" class="form-stack">
+                                    <div class="field">
+                                        <label class="form-label">Monto inicial</label>
+                                        <input class="input" id="montoInicial" type="number" step="0.01" value="0">
+                                    </div>
+                                    <button class="btn btn-dark" type="submit">Abrir caja</button>
+                                </form>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- ================= SECCION REPORTES ================= -->
+            <section id="seccionReportes" class="seccion oculto">
+
+                <div class="card soft-card" style="max-width: 920px; margin: 10px 20px; padding: 20px;">
+                    <div
+                        style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                        <div>
+                            <h2 style="margin:0; color:#21252d;">Reportes</h2>
+                            <div class="small-muted">Totales por día/semana/mes y top de variantes.</div>
+                        </div>
+
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <select id="selectModoReporte" class="form-select"
+                                style="min-width:160px; padding: 5px; border-radius: 5px;">
+                                <option value="dia">Día</option>
+                                <option value="semana">Semana</option>
+                                <option value="mes">Mes</option>
+                            </select>
+                            <button id="btnVerReporte" class="btn-primary" style="cursor: pointer;">Ver</button>
+                            <button id="btnResetReportes" class="btn-primary">Resetear</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3" style="margin-top:14px;">
+                        <div class="col-lg-5" style="flex:1; min-width:280px;">
+                            <div class="card soft-card">
+                                <div class="card-body">
+                                    <h5 id="reporteTitulo" class="card-title" style="margin:0 0 10px 0;">Reporte
+                                    </h5>
+
+                                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                                        <span class="small-muted">Cantidad de ventas</span>
+                                        <span id="repCantVentas" style="font-weight:600;">0</span>
+                                    </div>
+
+                                    <div
+                                        style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 10px;">
+                                        <span class="small-muted">Total vendido</span>
+                                        <span id="repTotalVendido" style="font-size:22px; font-weight:800;">$0,00</span>
+                                    </div>
+                                    <hr>
+                                    <div
+                                        style="display:flex; justify-content:space-between; margin-bottom:8px;margin-top: 10px;">
+                                        <span class="small-muted">Cantidad de compras</span>
+                                        <span id="repCantCompras" style="font-weight:600;">0</span>
+                                    </div>
+
+                                    <div
+                                        style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+                                        <span class="small-muted">Total comprado</span>
+                                        <span id="repTotalComprado" style="font-size:20px; font-weight:800;">$0</span>
+                                    </div>
+
+                                    <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                                        <span class="small-muted">Resultado</span>
+                                        <span id="repGanancia" style="font-size:20px; font-weight:800;">$0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-7" style="flex:1.4; min-width:320px;">
+                            <div class="card soft-card">
+                                <div class="card-body">
+                                    <h5 class="card-title" style="margin:0 0 10px 0;">Top 10 variantes (unidades)
+                                    </h5>
+
+                                    <div class="table-responsive">
+                                        <table class="tabla-productos tabla-reportes">
+
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Producto</th>
+                                                    <th>Variante</th>
+                                                    <th class="text-end">Unidades</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="repTopBody">
+                                                <tr>
+                                                    <td colspan="3" class="text-center small-muted"
+                                                        style="padding:18px;">Sin datos todavía.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= SECCION DASHBOARD ================= -->
+            <section id="seccionDashboard" class="seccion oculto">
+
+                <div class="page-head">
+                    <div>
+                        <h2 class="page-title">Dashboard</h2>
+                        <div class="small-muted">Resumen ejecutivo: ventas, caja, medios de pago, stock y actividad
+                            reciente.</div>
+                    </div>
+
+                    <div class="head-actions">
+                        <select id="dashPeriodo" class="select">
+                            <option value="dia">Hoy</option>
+                            <option value="semana">Semana</option>
+                            <option value="mes" selected>Mes</option>
+                        </select>
+                        <button id="btnRefrescarDashboard" class="btn-primary">Actualizar</button>
+                        <button id="btnResetDashboard" class="btn-primary">Reset</button>
+                    </div>
+                </div>
+
+                <!-- KPIs -->
+                <div class="dash-kpis">
+                    <div class="soft-card kpi-card">
+                        <div class="card-body">
+                            <div class="kpi-label">Ingresos (ventas)</div>
+                            <div class="kpi-value" id="kpiIngresos">$0</div>
+                            <div class="kpi-sub" id="kpiIngresosSub">—</div>
+                        </div>
+                    </div>
+
+                    <div class="soft-card kpi-card">
+                        <div class="card-body">
+                            <div class="kpi-label">Egresos (caja)</div>
+                            <div class="kpi-value" id="kpiEgresos">$0</div>
+                            <div class="kpi-sub" id="kpiEgresosSub">—</div>
+                        </div>
+                    </div>
+
+                    <div class="soft-card kpi-card">
+                        <div class="card-body">
+                            <div class="kpi-label">Resultado estimado</div>
+                            <div class="kpi-value" id="kpiResultado">$0</div>
+                            <div class="kpi-sub" id="kpiResultadoSub">Ingresos − Egresos</div>
+                        </div>
+                    </div>
+
+                    <div class="soft-card kpi-card">
+                        <div class="card-body">
+                            <div class="kpi-label">Caja abierta</div>
+                            <div class="kpi-value" id="kpiCajaEstado">—</div>
+                            <div class="kpi-sub">Saldo esperado: <b id="kpiCajaSaldo">$0</b></div>
+                        </div>
+                    </div>
+
+                    <div class="soft-card kpi-card">
+                        <div class="card-body">
+                            <div class="kpi-label">Ventas</div>
+                            <div class="kpi-value" id="kpiCantVentas">0</div>
+                            <div class="kpi-sub">Ticket promedio: <b id="kpiTicket">$0</b></div>
+                        </div>
+                    </div>
+
+                    <div class="soft-card kpi-card">
+                        <div class="card-body">
+                            <div class="kpi-label">Alertas de stock</div>
+                            <div class="kpi-value" id="kpiStockAlertas">0</div>
+                            <div class="kpi-sub">Variantes bajas o sin stock</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GRID principal -->
+                <div class="dash-grid">
+
+                    <!-- Medios de pago -->
+                    <div class="soft-card">
+                        <div class="card-body">
+                            <div class="card-head">
+                                <h5 class="card-title">Mix de medios de pago</h5>
+                                <span class="small-muted" id="mixPagoTotal">Total: $0</span>
+                            </div>
+                            <hr class="divider">
+                            <div id="mixPagoBars" class="bars"></div>
+
+                            <div class="table-wrap mt-12">
+                                <table class="table-soft">
+                                    <thead>
+                                        <tr>
+                                            <th>Medio</th>
+                                            <th class="text-end">Monto</th>
+                                            <th class="text-end">%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="mixPagoTable"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top productos -->
+                    <div class="soft-card">
+                        <div class="card-body">
+                            <div class="card-head">
+                                <h5 class="card-title">Top productos</h5>
+                                <span class="small-muted">Por ingresos (y unidades)</span>
+                            </div>
+                            <hr class="divider">
+
+                            <div class="table-wrap">
+                                <table class="table-soft">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th class="text-end">Unidades</th>
+                                            <th class="text-end">Ingresos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="topProductosBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stock bajo -->
+                    <div class="soft-card">
+                        <div class="card-body">
+                            <div class="card-head">
+                                <h5 class="card-title">Stock crítico</h5>
+                                <span class="small-muted">Variantes en 0 o bajo</span>
+                            </div>
+                            <hr class="divider">
+
+                            <div class="table-wrap">
+                                <table class="table-soft">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th>Variante</th>
+                                            <th class="text-end">Stock</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="stockCriticoBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actividad reciente -->
+                    <div class="soft-card">
+                        <div class="card-body">
+                            <div class="card-head">
+                                <h5 class="card-title">Actividad reciente</h5>
+                                <span class="small-muted">Caja + ventas</span>
+                            </div>
+                            <hr class="divider">
+
+                            <div class="table-wrap">
+                                <table class="table-soft">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Tipo</th>
+                                            <th>Desc</th>
+                                            <th class="text-end">Monto</th>
+                                            <th>Pago</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="actividadRecienteBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="/java.js"></script>
+
+</body>
+
+</html>
