@@ -1913,5 +1913,11 @@ body {
     justify-content: center;
     opacity: .7;
     z-index: 2;
-    /* 🔴 CLAVE */
+}
+
+#cdReembolsoBox {
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(33, 37, 45, .10);
+    background: rgba(17, 24, 39, .03);
 }

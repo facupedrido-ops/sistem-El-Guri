@@ -2269,3 +2269,737 @@ if (togglePass && passEl) {
   setInterval(renderLockInfo, 500);
   renderLockInfo();
 })();
+
+/* =========================================================
+   CAMBIOS / DEVOLUCIONES PRO (DEVUELVE + SE LLEVA + DIFERENCIA)
+   ========================================================= */
+
+const LS_CDEV = "cambios_devoluciones_v2";
+const LS_GC   = "giftcards_v1"; // si ya lo tenías, dejalo igual
+
+function loadArr(key){ try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; } }
+function saveArr(key, arr){ localStorage.setItem(key, JSON.stringify(arr)); }
+
+function toUpperSafe(x){ return (x||"").toString().trim().toUpperCase(); }
+function randCode(len=8){
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for(let i=0;i<len;i++) out += chars[Math.floor(Math.random()*chars.length)];
+  return out;
+}
+
+function getPrecioVentaProducto(p){
+  const n = Number(p?.precio);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function calcTotal(precioUnit, cantidad){
+  const p = Number(precioUnit || 0);
+  const c = Number(cantidad || 0);
+  return (Number.isFinite(p) ? p : 0) * (Number.isFinite(c) ? c : 0);
+}
+
+function cerrarSugerenciasSiClickAfuera(inputId, listId){
+  document.addEventListener("click", (e)=>{
+    const input = document.getElementById(inputId);
+    const list  = document.getElementById(listId);
+    if (!input || !list) return;
+    if (!e.target.closest("#"+inputId) && !e.target.closest("#"+listId)){
+      list.classList.add("oculto");
+    }
+  });
+}
+
+function setupBuscadorProductos(inputId, listId, onSelect){
+  const input = document.getElementById(inputId);
+  const list  = document.getElementById(listId);
+  if (!input || !list) return;
+
+  input.addEventListener("input", ()=>{
+    const txt = input.value.toLowerCase().trim();
+    list.innerHTML = "";
+    if (!txt){ list.classList.add("oculto"); return; }
+
+    const coincidencias = (stock?.productos || [])
+      .filter(p => (p.nombre||"").toLowerCase().includes(txt) || String(p.id||"").toLowerCase().includes(txt))
+      .slice(0, 12);
+
+    coincidencias.forEach(p=>{
+      const li = document.createElement("li");
+      li.textContent = `${p.id} - ${p.nombre}`;
+      li.addEventListener("click", ()=>{
+        input.value = `${p.id} - ${p.nombre}`;
+        list.classList.add("oculto");
+        onSelect(p);
+      });
+      list.appendChild(li);
+    });
+
+    list.classList.toggle("oculto", coincidencias.length === 0);
+  });
+
+  cerrarSugerenciasSiClickAfuera(inputId, listId);
+}
+
+/* ========= refs ========= */
+let devSel = null;
+let newSel = null;
+
+const cdTipo = document.getElementById("cdTipo");
+
+// Devuelve
+const cdDevBuscarProd = document.getElementById("cdDevBuscarProd");
+const cdDevTalle      = document.getElementById("cdDevTalle");
+const cdDevCantidad   = document.getElementById("cdDevCantidad");
+const cdDevPrecio     = document.getElementById("cdDevPrecio");
+
+// Se lleva
+const cdSeLlevaBox    = document.getElementById("cdSeLlevaBox");
+const cdNewBuscarProd = document.getElementById("cdNewBuscarProd");
+const cdNewTalle      = document.getElementById("cdNewTalle");
+const cdNewCantidad   = document.getElementById("cdNewCantidad");
+const cdNewPrecio     = document.getElementById("cdNewPrecio");
+
+// Diferencia UI
+const cdResumen         = document.getElementById("cdResumen");
+const cdAccionesDinero  = document.getElementById("cdAccionesDinero");
+const cdEtiquetaAccion  = document.getElementById("cdEtiquetaAccion");
+const cdModoDiferencia  = document.getElementById("cdModoDiferencia");
+const cdMedioPagoDif    = document.getElementById("cdMedioPagoDif");
+const cdNotaMedio       = document.getElementById("cdNotaMedio");
+
+const cdMotivo = document.getElementById("cdMotivo");
+const btnRegistrarCambioDev = document.getElementById("btnRegistrarCambioDev");
+
+/* ========= setup buscadores ========= */
+setupBuscadorProductos("cdDevBuscarProd", "cdDevSugerencias", (p)=>{
+  devSel = p;
+  cdDevPrecio.value = getPrecioVentaProducto(p);
+  recalcularDiferencia();
+});
+
+setupBuscadorProductos("cdNewBuscarProd", "cdNewSugerencias", (p)=>{
+  newSel = p;
+  cdNewPrecio.value = getPrecioVentaProducto(p);
+  recalcularDiferencia();
+});
+
+/* ========= helpers de modo ========= */
+function esCambio(){
+  return cdTipo?.value === "CAMBIO";
+}
+
+function setUIporTipo(){
+  const cambio = esCambio();
+  if (cdSeLlevaBox) cdSeLlevaBox.style.opacity = cambio ? "1" : "0.45";
+  if (cdNewBuscarProd) cdNewBuscarProd.disabled = !cambio;
+  if (cdNewTalle) cdNewTalle.disabled = !cambio;
+  if (cdNewCantidad) cdNewCantidad.disabled = !cambio;
+
+  if (!cambio){
+    // limpiar selección de "se lleva"
+    newSel = null;
+    if (cdNewBuscarProd) cdNewBuscarProd.value = "";
+    if (cdNewTalle) cdNewTalle.value = "";
+    if (cdNewCantidad) cdNewCantidad.value = 1;
+    if (cdNewPrecio) cdNewPrecio.value = "";
+  }
+  recalcularDiferencia();
+}
+
+cdTipo?.addEventListener("change", setUIporTipo);
+cdDevTalle?.addEventListener("change", recalcularDiferencia);
+cdDevCantidad?.addEventListener("input", recalcularDiferencia);
+cdNewTalle?.addEventListener("change", recalcularDiferencia);
+cdNewCantidad?.addEventListener("input", recalcularDiferencia);
+cdModoDiferencia?.addEventListener("change", ()=>{
+  // notita según modo
+  if (cdModoDiferencia.value === "GIFTCARD"){
+    cdNotaMedio.textContent = "Con Gift Card no sale plata de la caja (queda saldo a favor del cliente).";
+  } else {
+    cdNotaMedio.textContent = "";
+  }
+});
+
+/* ========= cálculo ========= */
+function recalcularDiferencia(){
+  const cambio = esCambio();
+
+  const devQty = Number(cdDevCantidad?.value || 0);
+  const devPU  = Number(cdDevPrecio?.value || 0);
+
+  const devOK = !!devSel && !!cdDevTalle?.value && devQty > 0;
+  const totalDev = devOK ? calcTotal(devPU, devQty) : 0;
+
+  if (!cambio){
+    // Devolución: no hay "se lleva"
+    if (!devOK){
+      cdResumen.textContent = "Elegí prenda que devuelve (producto + talle + cantidad).";
+      cdAccionesDinero.classList.add("oculto");
+      return;
+    }
+    cdResumen.textContent = `Total devolución: $${moneyAR(totalDev)}. (Podés devolver dinero o emitir gift card por ese monto.)`;
+    // En devolución: mostrar acciones (devolver o giftcard) si querés. Por ahora lo dejamos simple: se resuelve al registrar.
+    cdAccionesDinero.classList.remove("oculto");
+    cdEtiquetaAccion.textContent = "Resolver devolución";
+    cdModoDiferencia.innerHTML = `
+      <option value="DEVOLVER">Devolver dinero</option>
+      <option value="GIFTCARD">Emitir Gift Card</option>
+    `;
+    if (cdModoDiferencia.value !== "GIFTCARD" && cdModoDiferencia.value !== "DEVOLVER"){
+      cdModoDiferencia.value = "GIFTCARD";
+    }
+    return;
+  }
+
+  // Cambio: requiere prenda nueva
+  const newQty = Number(cdNewCantidad?.value || 0);
+  const newPU  = Number(cdNewPrecio?.value || 0);
+  const newOK  = !!newSel && !!cdNewTalle?.value && newQty > 0;
+  const totalNew = newOK ? calcTotal(newPU, newQty) : 0;
+
+  if (!devOK || !newOK){
+    cdResumen.textContent = "Elegí ambas prendas (devuelve y se lleva) para calcular la diferencia.";
+    cdAccionesDinero.classList.add("oculto");
+    return;
+  }
+
+  const diff = totalNew - totalDev; // + => cobrar | - => devolver/saldo a favor
+
+  if (diff === 0){
+    cdResumen.textContent = `Total devuelve: $${moneyAR(totalDev)} | Total se lleva: $${moneyAR(totalNew)} → Sin diferencia.`;
+    cdAccionesDinero.classList.add("oculto");
+    return;
+  }
+
+  cdAccionesDinero.classList.remove("oculto");
+
+  if (diff > 0){
+    cdResumen.textContent = `Devuelve: $${moneyAR(totalDev)} | Se lleva: $${moneyAR(totalNew)} → Diferencia a cobrar: $${moneyAR(diff)}.`;
+    cdEtiquetaAccion.textContent = "Cobrar diferencia";
+    cdModoDiferencia.innerHTML = `<option value="COBRAR">Cobrar diferencia</option>`;
+    cdModoDiferencia.value = "COBRAR";
+  } else {
+    const favor = Math.abs(diff);
+    cdResumen.textContent = `Devuelve: $${moneyAR(totalDev)} | Se lleva: $${moneyAR(totalNew)} → Saldo a favor del cliente: $${moneyAR(favor)}.`;
+    cdEtiquetaAccion.textContent = "Resolver saldo a favor";
+    cdModoDiferencia.innerHTML = `
+      <option value="GIFTCARD">Emitir Gift Card (recomendado)</option>
+      <option value="DEVOLVER">Devolver dinero</option>
+    `;
+    if (cdModoDiferencia.value !== "GIFTCARD" && cdModoDiferencia.value !== "DEVOLVER"){
+      cdModoDiferencia.value = "GIFTCARD";
+    }
+  }
+}
+
+/* ========= registrar ========= */
+btnRegistrarCambioDev?.addEventListener("click", ()=>{
+  const cambio = esCambio();
+
+  // valida devuelve
+  if (!devSel) return alert("Seleccioná el producto que devuelve.");
+  const devTalle = cdDevTalle.value;
+  const devQty = Number(cdDevCantidad.value || 0);
+  if (!devTalle) return alert("Elegí talle en 'devuelve'.");
+  if (!Number.isInteger(devQty) || devQty <= 0) return alert("Cantidad inválida en 'devuelve'.");
+
+  const devPU = Number(cdDevPrecio.value || 0);
+  const totalDev = calcTotal(devPU, devQty);
+
+  // stock devuelve (siempre suma)
+  if (!devSel.talles || devSel.talles[devTalle] === undefined) return alert("Talle inválido en producto devuelto.");
+  devSel.talles[devTalle] += devQty;
+
+  // si cambio, valida se lleva y descuenta stock
+  let newTalle = null, newQty = 0, newPU = 0, totalNew = 0;
+  if (cambio){
+    if (!newSel) return alert("Seleccioná el producto que se lleva.");
+    newTalle = cdNewTalle.value;
+    newQty = Number(cdNewCantidad.value || 0);
+    if (!newTalle) return alert("Elegí talle en 'se lleva'.");
+    if (!Number.isInteger(newQty) || newQty <= 0) return alert("Cantidad inválida en 'se lleva'.");
+
+    if (!newSel.talles || newSel.talles[newTalle] === undefined) return alert("Talle inválido en producto nuevo.");
+
+    // chequeo stock suficiente
+    if (newSel.talles[newTalle] < newQty){
+      return alert(`No hay stock suficiente del producto nuevo (${newSel.nombre} talle ${newTalle}).`);
+    }
+
+    newPU = Number(cdNewPrecio.value || 0);
+    totalNew = calcTotal(newPU, newQty);
+
+    // descuenta stock de lo que se lleva
+    newSel.talles[newTalle] -= newQty;
+  }
+
+  // resolver caja / giftcard
+  if (typeof loadCaja !== "function") {
+  alert("Sistema de caja no disponible.");
+  return;
+}
+const state = loadCaja();
+
+  const cajaAbierta = !!(state && state.abierta && state.caja);
+
+  // diff (+ cobrar / - devolver / 0 nada)
+  const diff = cambio ? (totalNew - totalDev) : (-totalDev); 
+  // Para devolución: consideramos "saldo a favor" = totalDev (para resolver con devolver o giftcard)
+
+  const modo = cdModoDiferencia?.value || (cambio ? "COBRAR" : "GIFTCARD");
+  const medio = cdMedioPagoDif?.value || "EFECTIVO";
+
+  let resolucion = null;
+
+  if (!cambio){
+    // DEVOLUCION: totalDev a favor del cliente
+    if (totalDev <= 0) return alert("Total devolución inválido.");
+
+    if (modo === "DEVOLVER"){
+      // egreso en caja
+      if (!cajaAbierta){
+        alert("Caja cerrada: se registró la devolución y stock, pero NO impactó en caja.");
+      } else {
+        state.movimientos.push({
+          id: Date.now(),
+          caja_id: state.caja.id,
+          fecha: nowStr(),
+          tipo: "EGRESO",
+          descripcion: `Devolución - ${devSel.nombre} (${devTalle}) x${devQty}`,
+          monto: -Math.abs(totalDev),
+          medio_pago: medio
+        });
+        saveCaja(state);
+        try { renderCaja(); } catch {}
+      }
+      resolucion = { tipo: "DEVOLVER_DINERO", monto: totalDev, medio };
+    } else {
+      // GIFTCARD (no mueve caja)
+      const codigo = `GC-${randCode(8)}`;
+      const gcs = loadArr(LS_GC);
+      gcs.push({
+        id: Date.now(),
+        codigo,
+        saldo: totalDev,
+        emitida_en: nowStr(),
+        nombre: "",
+        medio_pago: "AJUSTE",
+        movimientos: [{ fecha: nowStr(), tipo: "EMITIDA_POR_DEVOLUCION", monto: totalDev }]
+      });
+      saveArr(LS_GC, gcs);
+      resolucion = { tipo: "GIFTCARD", monto: totalDev, codigo };
+      alert(` Gift Card emitida: ${codigo} | Saldo: $${moneyAR(totalDev)}`);
+    }
+  } else {
+    // CAMBIO
+    if (diff > 0){
+      // cobrar diferencia (ingreso)
+      if (!cajaAbierta){
+        alert("Caja cerrada: se registró el cambio y stock, pero NO impactó en caja (diferencia a cobrar pendiente).");
+      } else {
+        state.movimientos.push({
+          id: Date.now(),
+          caja_id: state.caja.id,
+          fecha: nowStr(),
+          tipo: "INGRESO",
+          descripcion: `Diferencia cambio - ${devSel.nombre} → ${newSel.nombre}`,
+          monto: Math.abs(diff),
+          medio_pago: medio
+        });
+        saveCaja(state);
+        try { renderCaja(); } catch {}
+      }
+      resolucion = { tipo: "COBRO_DIFERENCIA", monto: diff, medio };
+    } else if (diff < 0){
+      const favor = Math.abs(diff);
+      if (modo === "DEVOLVER"){
+        // devolver dinero (egreso)
+        if (!cajaAbierta){
+          alert("Caja cerrada: se registró el cambio y stock, pero NO impactó en caja (devolución pendiente).");
+        } else {
+          state.movimientos.push({
+            id: Date.now(),
+            caja_id: state.caja.id,
+            fecha: nowStr(),
+            tipo: "EGRESO",
+            descripcion: `Devolución diferencia cambio - ${devSel.nombre} → ${newSel.nombre}`,
+            monto: -Math.abs(favor),
+            medio_pago: medio
+          });
+          saveCaja(state);
+          try { renderCaja(); } catch {}
+        }
+        resolucion = { tipo: "DEVOLVER_DIFERENCIA", monto: favor, medio };
+      } else {
+        // gift card (no mueve caja)
+        const codigo = `GC-${randCode(8)}`;
+        const gcs = loadArr(LS_GC);
+        gcs.push({
+          id: Date.now(),
+          codigo,
+          saldo: favor,
+          emitida_en: nowStr(),
+          nombre: "",
+          medio_pago: "AJUSTE",
+          movimientos: [{ fecha: nowStr(), tipo: "EMITIDA_POR_DIFERENCIA_CAMBIO", monto: favor }]
+        });
+        saveArr(LS_GC, gcs);
+        resolucion = { tipo: "GIFTCARD_DIFERENCIA", monto: favor, codigo };
+        alert(` Gift Card emitida: ${codigo} | Saldo: $${moneyAR(favor)}`);
+      }
+    } else {
+      resolucion = { tipo: "SIN_DIFERENCIA" };
+    }
+  }
+
+  // guardar registro
+  const arr = loadArr(LS_CDEV);
+  arr.push({
+    id: Date.now(),
+    fecha: nowStr(),
+    tipo: cambio ? "CAMBIO" : "DEVOLUCION",
+    devuelve: {
+      id: devSel.id,
+      nombre: devSel.nombre,
+      talle: devTalle,
+      cantidad: devQty,
+      precio_unit: devPU,
+      total: totalDev
+    },
+    se_lleva: cambio ? {
+      id: newSel.id,
+      nombre: newSel.nombre,
+      talle: newTalle,
+      cantidad: newQty,
+      precio_unit: newPU,
+      total: totalNew
+    } : null,
+    resolucion,
+    motivo: (cdMotivo.value || "").trim()
+  });
+  saveArr(LS_CDEV, arr);
+
+  // refrescar UI
+  try { renderProductos(); } catch {}
+
+  // limpiar
+  devSel = null; newSel = null;
+  cdDevBuscarProd.value = "";
+  cdDevTalle.value = "";
+  cdDevCantidad.value = 1;
+  cdDevPrecio.value = "";
+
+  cdNewBuscarProd.value = "";
+  cdNewTalle.value = "";
+  cdNewCantidad.value = 1;
+  cdNewPrecio.value = "";
+
+  cdMotivo.value = "";
+  setUIporTipo();
+
+  alert("✅ Registrado correctamente (stock actualizado).");
+});
+
+// init
+setUIporTipo();
+
+// =========================================================
+// Integrar Gift Card como medio de pago en VENTAS
+// (Agrega opción + descuenta saldo al confirmar venta)
+// =========================================================
+/* =========================================================
+   FIX GIFT CARD (EMITIR / CONSULTAR / USAR EN VENTA)
+   ========================================================= */
+(() => {
+  const LS_GC = "giftcards_v1";
+
+  function nowStr() {
+    return new Date().toLocaleString("es-AR");
+  }
+
+  function moneyAR(n) {
+    return Number(n || 0).toLocaleString("es-AR");
+  }
+
+  function loadArr(key) {
+    try { return JSON.parse(localStorage.getItem(key) || "[]"); }
+    catch { return []; }
+  }
+
+  function saveArr(key, arr) {
+    localStorage.setItem(key, JSON.stringify(arr));
+  }
+
+  function loadGiftCards() { return loadArr(LS_GC); }
+  function saveGiftCards(arr) { saveArr(LS_GC, arr); }
+
+  function toUpperSafe(x) {
+    return (x || "").toString().trim().toUpperCase();
+  }
+
+  function randCode(len = 8) {
+    const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    let out = "";
+    for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+    return out;
+  }
+
+  function findGiftByCode(code) {
+    const c = toUpperSafe(code);
+    return loadGiftCards().find(g => g.codigo === c) || null;
+  }
+
+  function emitirGiftCard({ monto, medio_pago, nombre, motivo }) {
+    const m = Number(monto || 0);
+    if (!(m > 0)) return null;
+
+    const codigo = `GC-${randCode(8)}`;
+    const gcs = loadGiftCards();
+
+    const gift = {
+      id: Date.now(),
+      codigo,
+      saldo: m,
+      emitida_en: nowStr(),
+      nombre: (nombre || "").trim(),
+      medio_pago: medio_pago || "EFECTIVO",
+      movimientos: [{ fecha: nowStr(), tipo: motivo || "EMISION", monto: m }]
+    };
+
+    gcs.push(gift);
+    saveGiftCards(gcs);
+    return gift;
+  }
+
+  // ===== UI Gift Card: Emitir / Consultar =====
+  document.addEventListener("DOMContentLoaded", () => {
+    const btnEmitir = document.getElementById("btnEmitirGift");
+    const btnConsultar = document.getElementById("btnConsultarGift");
+
+    // EMITIR
+    btnEmitir?.addEventListener("click", () => {
+      const monto = Number(document.getElementById("gcMonto")?.value || 0);
+      const medio = document.getElementById("gcMedioPago")?.value || "EFECTIVO";
+      const nombre = document.getElementById("gcNombre")?.value || "";
+
+      if (monto <= 0) return alert("Monto inválido");
+
+      const gift = emitirGiftCard({ monto, medio_pago: medio, nombre, motivo: "EMISION" });
+      if (!gift) return alert("No se pudo emitir la Gift Card.");
+
+      // impactar caja como INGRESO (si existe tu sistema de caja)
+      if (typeof window.loadCaja === "function" && typeof window.saveCaja === "function") {
+        const state = window.loadCaja();
+        if (state?.abierta && state?.caja && Array.isArray(state.movimientos)) {
+          state.movimientos.push({
+            id: Date.now(),
+            caja_id: state.caja.id,
+            fecha: nowStr(),
+            tipo: "INGRESO",
+            descripcion: `Emisión GiftCard ${gift.codigo}${gift.nombre ? " - " + gift.nombre : ""}`,
+            monto: Math.abs(monto),
+            medio_pago: medio
+          });
+          window.saveCaja(state);
+          try { if (typeof window.renderCaja === "function") window.renderCaja(); } catch {}
+        }
+      }
+
+      const info = document.getElementById("gcEmitidaInfo");
+      if (info) info.textContent = ` Emitida: ${gift.codigo} | Saldo: $${moneyAR(gift.saldo)}`;
+
+      document.getElementById("gcMonto").value = "";
+      document.getElementById("gcNombre").value = "";
+    });
+
+    // CONSULTAR
+    btnConsultar?.addEventListener("click", () => {
+      const code = toUpperSafe(document.getElementById("gcCodigo")?.value || "");
+      const out = document.getElementById("gcSaldoTxt");
+      if (!out) return;
+
+      if (!code) { out.textContent = "Saldo: —"; return; }
+
+      const g = findGiftByCode(code);
+      if (!g) { out.textContent = " Gift Card no encontrada"; return; }
+
+      out.textContent = `Saldo: $${moneyAR(g.saldo)} | Emitida: ${g.emitida_en}`;
+    });
+  });
+
+  // ===== Integrar Gift Card como medio de pago en Ventas =====
+  document.addEventListener("DOMContentLoaded", () => {
+    const selectPago = document.getElementById("selectPago");
+    const cont = document.getElementById("contenedorBanco");
+    if (!selectPago || !cont) return;
+
+    // agregar opción si no está
+    const ya = Array.from(selectPago.options).some(o => o.value === "giftcard");
+    if (!ya) {
+      const opt = document.createElement("option");
+      opt.value = "giftcard";
+      opt.textContent = "Gift Card";
+      selectPago.appendChild(opt);
+    }
+
+    function renderGiftUI() {
+      cont.innerHTML = "";
+      if (selectPago.value !== "giftcard") return;
+
+      cont.innerHTML = `
+        <div style="display:grid; gap:8px;">
+          <input id="ventaGiftCodigo" class="input" placeholder="Código Gift Card (GC-XXXX)" />
+          <div class="small-muted" id="ventaGiftInfo" data-ok="0">Ingresá el código para validar saldo.</div>
+          <button id="btnValidarGiftVenta" class="btn btn-dark" type="button">Validar</button>
+        </div>
+      `;
+
+      document.getElementById("btnValidarGiftVenta")?.addEventListener("click", () => {
+        const code = toUpperSafe(document.getElementById("ventaGiftCodigo")?.value || "");
+        const info = document.getElementById("ventaGiftInfo");
+
+        const g = findGiftByCode(code);
+        if (!g) {
+          info.textContent = "Gift card no encontrada.";
+          info.dataset.ok = "0";
+          info.dataset.code = "";
+          return;
+        }
+
+        info.textContent = `Saldo disponible: $${moneyAR(g.saldo)}`;
+        info.dataset.ok = "1";
+        info.dataset.code = g.codigo;
+      });
+    }
+
+    selectPago.addEventListener("change", renderGiftUI);
+
+    // Hook confirmar venta (antes de tu lógica, captura)
+    const btnConfirmar = document.getElementById("btnConfirmarVenta");
+    if (!btnConfirmar) return;
+
+    btnConfirmar.addEventListener("click", () => {
+      if (selectPago.value !== "giftcard") return;
+
+      const info = document.getElementById("ventaGiftInfo");
+      const ok = info?.dataset?.ok === "1";
+      const code = info?.dataset?.code;
+
+      if (!ok || !code) {
+        alert("Validá la Gift Card antes de registrar la venta.");
+        throw new Error("GiftCard no validada");
+      }
+
+      const gcs = loadGiftCards();
+      const g = gcs.find(x => x.codigo === code);
+      if (!g) { alert("Gift card no encontrada."); throw new Error("GiftCard missing"); }
+
+      const totalTxt = document.getElementById("totalVenta")?.innerText || "0";
+      const total = (typeof window.parseMoneyAR === "function")
+        ? window.parseMoneyAR(totalTxt)
+        : Number(String(totalTxt).replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")) || 0;
+
+      if (g.saldo <= 0) { alert("Gift card sin saldo."); throw new Error("saldo 0"); }
+      if (g.saldo < total) {
+        alert(`Saldo insuficiente. Saldo: $${moneyAR(g.saldo)} | Total: $${moneyAR(total)}`);
+        throw new Error("saldo insuficiente");
+      }
+
+      g.saldo = Number(g.saldo) - Number(total);
+      g.movimientos = g.movimientos || [];
+      g.movimientos.push({ fecha: nowStr(), tipo: "USO", monto: -Math.abs(total), venta_total: total });
+
+      saveGiftCards(gcs);
+
+      alert(`Gift card aplicada | Nuevo saldo: $${moneyAR(g.saldo)}`);
+    }, true);
+  });
+
+})();
+
+// ================== NAV: ABRIR SECCIONES (FIX) ==================
+document.addEventListener("DOMContentLoaded", () => {
+  const btnCambios = document.getElementById("btnCambios");
+  const btnGiftCard = document.getElementById("btnGiftCard");
+
+  const seccionCambios = document.getElementById("seccionCambios");
+  const seccionGiftCard = document.getElementById("seccionGiftCard");
+
+  // DEBUG: te dice si encuentra o no los elementos
+  console.log("btnCambios:", btnCambios);
+  console.log("btnGiftCard:", btnGiftCard);
+  console.log("seccionCambios:", seccionCambios);
+  console.log("seccionGiftCard:", seccionGiftCard);
+
+  function ocultarTodo() {
+    document.querySelectorAll(".seccion").forEach(s => s.classList.add("oculto"));
+  }
+
+  function mostrarSeccion(id) {
+    ocultarTodo();
+    const sec = document.getElementById(id);
+    if (!sec) {
+      alert("No encuentro la sección: " + id);
+      return;
+    }
+    sec.classList.remove("oculto");
+  }
+
+  if (btnCambios) {
+    btnCambios.addEventListener("click", (e) => {
+      e.preventDefault();
+      console.log("CLICK Cambios");
+      mostrarSeccion("seccionCambios");
+    });
+  } else {
+    console.warn("No existe #btnCambios en el HTML");
+  }
+
+  if (btnGiftCard) {
+    btnGiftCard.addEventListener("click", (e) => {
+      e.preventDefault();
+      console.log("CLICK GiftCard");
+      mostrarSeccion("seccionGiftCard");
+    });
+  } else {
+    console.warn("No existe #btnGiftCard en el HTML");
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const btnCambios = document.getElementById("btnCambios");
+  const btnGiftCard = document.getElementById("btnGiftCard");
+
+  function ocultarTodoSeguro() {
+    // 1) Si tu sistema ya tiene una función para ocultar secciones, la usamos
+    if (typeof ocultarTodasLasSecciones === "function") {
+      ocultarTodasLasSecciones();
+      return;
+    }
+
+    // 2) Fallback: ocultar por clase .seccion
+    document.querySelectorAll(".seccion").forEach(sec => sec.classList.add("oculto"));
+  }
+
+  function mostrarSeguro(id) {
+    ocultarTodoSeguro();
+    const sec = document.getElementById(id);
+    if (!sec) return console.warn("No existe la sección:", id);
+    sec.classList.remove("oculto");
+  }
+
+  if (btnCambios) {
+    btnCambios.onclick = (e) => {
+      e.preventDefault();
+      mostrarSeguro("seccionCambios");
+    };
+  }
+
+  if (btnGiftCard) {
+    btnGiftCard.onclick = (e) => {
+      e.preventDefault();
+      mostrarSeguro("seccionGiftCard");
+    };
+  }
+});
