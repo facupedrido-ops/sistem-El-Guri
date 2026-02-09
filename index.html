@@ -53,9 +53,9 @@
             <h2 class="logo"><a href="index.html"><img src="img/logo.png" alt="logo" style="width: 80px;"></a></h2>
 
             <div class="menu-section">
-                <p class="menu-title">INFORMES</p>
+                <p class="menu-title privado">INFORMES</p>
 
-                <button class="menu-btn" id="btnDashboard">
+                <button class="menu-btn privado" id="btnDashboard">
                     <svg class="menu-icon" viewBox="0 -960 960 960">
                         <path
                             d="M120-120v-720h720v720H120Zm80-80h120v-200H200v200Zm200 0h120v-360H400v360Zm200 0h120v-520H600v520Z" />
@@ -63,7 +63,7 @@
                     <span>Dashboard</span>
                 </button>
 
-                <button class="menu-btn" id="btnReportes">
+                <button class="menu-btn privado" id="btnReportes">
                     <svg class="menu-icon" viewBox="0 -960 960 960">
                         <path
                             d="M120-120v-720h720v720H120Zm80-80h120v-200H200v200Zm200 0h120v-360H400v360Zm200 0h120v-520H600v520Z" />
@@ -126,7 +126,7 @@
 
 
 
-                <button class="menu-btn" id="btnCompras">
+                <button class="menu-btn privado" id="btnCompras">
                     <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
                         fill="#1f1f1f">
                         <path
@@ -170,6 +170,11 @@
                 <div class="modal-contenido">
                     <h2 id="tituloModal">Agregar Producto</h2>
 
+                    <select id="inputGenero" class="input">
+                        <option value="H">Hombre</option>
+                        <option value="M">Mujer</option>
+                    </select>
+
                     <input id="inputId" type="text" placeholder="ID" disabled>
                     <span class="error" id="errorId"></span>
 
@@ -189,13 +194,24 @@
                     </div>
                     <span class="error" id="errorCategoria"></span>
 
-                    <div id="stockTallesWrapper">
-                        <label>Stock inicial:</label>
-                        <div class="input-talles">
-                            <input type="number" id="stockS" placeholder="S" min="0" autocomplete="off">
-                            <input type="number" id="stockM" placeholder="M" min="0" autocomplete="off">
-                            <input type="number" id="stockL" placeholder="L" min="0" autocomplete="off">
-                            <input type="number" id="stockXL" placeholder="XL" min="0" autocomplete="off">
+                    <div class="form-group">
+                        <label style="font-weight: bold;">Tipo de talles</label>
+                        <select id="selectTipoTalles" class="input">
+                            <option value="auto">Automático (según categoría/nombre)</option>
+                            <option value="letras_ropa">Ropa letras (S/M/L/XL...)</option>
+                            <option value="numeros_1_6">Números 1-6 (+ Especiales)</option>
+                            <option value="numeros_pantalon">Pantalón 38-48 (+ Especiales)</option>
+                            <option value="unico">Único</option>
+                            <option value="boxer">Boxer (M a XXXXL)</option>
+                        </select>
+                    </div>
+
+                    <!-- STOCK POR TALLES (DINÁMICO) -->
+                    <div class="form-group">
+                        <label style="font-weight: bold;">Stock por talle</label>
+                        <div id="stockInputs" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;"></div>
+                        <div class="small-muted" style="margin-top:6px;">
+                            Se arma automático según Categoría (y si editás, respeta los talles del producto).
                         </div>
                     </div>
 
@@ -221,7 +237,8 @@
             </div>
 
             <!-- ================= SECCION COMPRAS ================= -->
-            <section id="seccionCompras" class="seccion oculto" style="width: 820px; padding: 0px;margin-left: 250px; ">
+            <section id="seccionCompras" class="seccion oculto privado"
+                style="width: 820px; padding: 0px;margin-left: 250px; ">
 
 
                 <!-- Contenedor estilo tarjeta como registro de venta -->
@@ -248,14 +265,7 @@
                     <div class="form-group" style="margin-bottom: 15px; margin-top: 15px;">
                         <label style="font-weight: bold; color: #21252d; display:block; margin-bottom: 5px;">Cantidad
                             por talle:</label>
-                        <input type="number" id="compraS" placeholder="S" min="0"
-                            style="width: 60px; padding: 8px; margin-right: 5px; border: 1px solid #ccc; border-radius: 5px;">
-                        <input type="number" id="compraM" placeholder="M" min="0"
-                            style="width: 60px; padding: 8px; margin-right: 5px; border: 1px solid #ccc; border-radius: 5px;">
-                        <input type="number" id="compraL" placeholder="L" min="0"
-                            style="width: 60px; padding: 8px; margin-right: 5px; border: 1px solid #ccc; border-radius: 5px;">
-                        <input type="number" id="compraXL" placeholder="XL" min="0"
-                            style="width: 60px; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+                        <div id="compraTallesInputs" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
                     </div>
                     <button id="btnAgregarCompra" class="btn-primary"
                         style="padding-right: 10px; margin-top: 3px; margin-bottom: 8px; padding-bottom: 7px; padding-top: 7px; cursor: pointer;">Agregar
@@ -295,7 +305,7 @@
             <section id="seccionProductos" class="oculto">
 
                 <div class="barra-productos">
-                    <button id="btnAbrirModalProducto" class="btn-primary" style="cursor: pointer;;"> +
+                    <button id="btnAbrirModalProducto" class="btn-primary privado" style="cursor: pointer;;"> +
                         Nuevo</button>
                 </div>
 
@@ -305,10 +315,10 @@
                     <div>ID</div>
                     <div>Nombre</div>
                     <div>Precio venta</div>
-                    <div>Precio compra</div>
+                    <div class="privado">Precio compra</div>
                     <div>Categoría</div>
                     <div>Talles</div>
-                    <div>Acciones</div>
+                    <div class="privado">Acciones</div>
                 </div>
 
                 <div id="listaProductos" class="productos-container"></div>
@@ -353,6 +363,7 @@
                                 <option value="transferencia">Transferencia</option>
                                 <option value="tarjeta-credito">Tarjeta de crédito</option>
                                 <option value="tarjeta-debito">Tarjeta de débito</option>
+                                <option value="cuenta-corriente">Cuenta Corriente</option>
                             </select>
                             <div id="contenedorBanco"></div>
                             <input id="inputCuotas" type="number" placeholder="Cuotas" min="1" value="1" class="oculto">
@@ -403,7 +414,7 @@
                             automáticamente.</div>
                     </div>
                 </div>
-                <button id="btnResetCaja" class="btn-primary">
+                <button id="btnResetCaja" class="btn-primary" style="margin-bottom: 5px;">
                     Resetear
                 </button>
 
@@ -436,6 +447,24 @@
                                     <h5 class="card-title">Movimiento manual</h5>
                                     <div class="small-muted mb-10">Ingreso o egreso fuera de ventas (ej: compra de
                                         insumos).</div>
+
+                                    <!-- ===== PAGO CUENTA CORRIENTE ===== -->
+                                    <div class="card soft-card" style="margin-bottom:12px;">
+                                        <div class="card-body">
+                                            <label style="display:flex; align-items:center; gap:8px;">
+                                                <input type="checkbox" id="chkPagoCC">
+                                                <strong>Pago de Cuenta Corriente</strong>
+                                            </label>
+
+                                            <input id="ccBuscarCliente" class="input"
+                                                placeholder="Buscar cliente (nombre / tel / email / DNI)"
+                                                style="margin-top:8px;" disabled />
+
+                                            <div id="ccSaldoTxt" class="small-muted" style="margin-top:6px;">
+                                                Saldo: —
+                                            </div>
+                                        </div>
+                                    </div>
 
                                     <form id="formMovCaja" class="form-stack">
                                         <div class="field">
@@ -561,7 +590,7 @@
             </section>
 
             <!-- ================= SECCION REPORTES ================= -->
-            <section id="seccionReportes" class="seccion oculto">
+            <section id="seccionReportes" class="seccion oculto privado">
 
                 <div class="card soft-card" style="max-width: 920px; margin: 10px 20px; padding: 20px;">
                     <div
@@ -654,7 +683,7 @@
             </section>
 
             <!-- ================= SECCION DASHBOARD ================= -->
-            <section id="seccionDashboard" class="seccion oculto">
+            <section id="seccionDashboard" class="seccion oculto privado">
 
                 <div class="page-head">
                     <div>
@@ -734,6 +763,7 @@
                             <div class="card-head">
                                 <h5 class="card-title">Mix de medios de pago</h5>
                                 <span class="small-muted" id="mixPagoTotal">Total: $0</span>
+                                <button type="button" class="dash-toggle-btn" id="dashToggleMix">Más</button>
                             </div>
                             <hr class="divider">
                             <div id="mixPagoBars" class="bars"></div>
@@ -758,7 +788,8 @@
                         <div class="card-body">
                             <div class="card-head">
                                 <h5 class="card-title">Top productos</h5>
-                                <span class="small-muted">Por ingresos (y unidades)</span>
+                                <span class="small-muted">Por ingresos (y unidades)</span><button type="button"
+                                    class="dash-toggle-btn" id="dashToggleTop">Más</button>
                             </div>
                             <hr class="divider">
 
@@ -783,6 +814,7 @@
                             <div class="card-head">
                                 <h5 class="card-title">Stock crítico</h5>
                                 <span class="small-muted">Variantes en 0 o bajo</span>
+                                <button type="button" class="dash-toggle-btn" id="dashToggleStock">Más</button>
                             </div>
                             <hr class="divider">
 
@@ -807,6 +839,7 @@
                             <div class="card-head">
                                 <h5 class="card-title">Actividad reciente</h5>
                                 <span class="small-muted">Caja + ventas</span>
+                                <button type="button" class="dash-toggle-btn" id="dashToggleAct">Más</button>
                             </div>
                             <hr class="divider">
 
@@ -1037,11 +1070,6 @@
                                 </div>
 
                                 <hr class="divider">
-
-                                <div class="small-muted">
-                                    Para usarla en una venta: elegí “Gift Card” como medio de pago (te lo agrego en el
-                                    JS).
-                                </div>
                             </div>
                         </div>
                     </div>

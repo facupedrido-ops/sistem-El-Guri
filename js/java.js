@@ -20,7 +20,7 @@ class Producto {
       <div>${this.id}</div>
       <div>${this.nombre}</div>
       <div>$${this.precio}</div>
-      <div class="small-muted">$${precioCompraOK}</div>
+      <div class="small-muted privado">$${precioCompraOK}</div>
       <div>${this.categoria}</div>
       <div class="talles"></div>
             <div class="acciones">
@@ -93,19 +93,37 @@ const stock = new Stock();
 /* ================= GENERADOR DE ID AUTOMÁTICO ================= */
 let contadorProductos = 0;
 
-function generarID() {
-    const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+/* ================= GENERADOR DE ID CORRELATIVO (H/1000, M/1000) ================= */
 
-    let grupo = Math.floor(stock.productos.length / 100);
-    if (grupo >= letras.length) grupo = letras.length - 1;
+function getMaxCorrelativo(prefix) {
+  let max = 0;
 
-    let id;
-    do {
-        const numero = Math.floor(1000 + Math.random() * 9000);
-        id = `${letras[grupo]}${numero}`;
-    } while (stock.productos.some(p => p.id === id)); 
+  (stock.productos || []).forEach(p => {
+    const id = String(p.id || "").toUpperCase().trim();
 
-    return id;
+    // Espera formato H/1000 o M/1000
+    const m = id.match(/^([HM])\/(\d+)$/);
+    if (!m) return;
+
+    const pref = m[1];
+    const num = Number(m[2]);
+
+    if (pref === prefix && Number.isFinite(num)) {
+      if (num > max) max = num;
+    }
+  });
+
+  return max;
+}
+
+function generarID(pref = "H") {
+  const prefix = pref.toUpperCase();
+  const base = 1000;
+
+  const maxActual = getMaxCorrelativo(prefix);
+  const next = Math.max(base, maxActual + 1);
+
+  return `${prefix}/${next}`;
 }
 
 /* ================= RENDERIZADO ================= */
@@ -132,6 +150,8 @@ const btnGuardar = document.getElementById("btnGuardar");
 const btnCancelar = document.getElementById("btnCancelar");
 const tituloModal = document.getElementById("tituloModal");
 const sugerenciasCategorias = document.getElementById("sugerenciasCategorias");
+const inputGenero = document.getElementById("inputGenero");
+const selectTipoTalles = document.getElementById("selectTipoTalles");
 
 const errorId = document.getElementById("errorId");
 const errorNombre = document.getElementById("errorNombre");
@@ -159,11 +179,14 @@ inputCategoria.addEventListener("blur", () => {
     inputCategoria.value = capitalizarTexto(inputCategoria.value);
 });
 
-// Sugerencias de categorias
 function obtenerCategoriasUnicas() {
-    const categorias = stock.productos.map(p => p.categoria);
-    return [...new Set(categorias.filter(c => c))]; // sin vacíos y sin repetir
+  const categorias = (stock.productos || [])
+    .map(p => (p.categoria || "").trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(categorias.filter(c => c)));
 }
+
 
 inputCategoria.addEventListener("input", () => {
     const texto = inputCategoria.value.toLowerCase().trim();
@@ -203,49 +226,193 @@ inputsModal.forEach((input, index) => {
     });
 });
 
-function limpiarStockTalles() {
-    stockS.value = "";
-    stockM.value = "";
-    stockL.value = "";
-    stockXL.value = "";
+// ================= TALLES DINÁMICOS (MODAL PRODUCTO) =================
+const stockInputsWrap = document.getElementById("stockInputs");
+
+// 1) Esquemas de talles por “tipo”
+const ESQUEMAS_TALLES = {
+  letras_ropa: ["S","M","L","XL","XXL","XXXL"],
+  numeros_pantalon: ["38","40","42","44","46","48","ESPECIALES"],
+  numeros_1_6: ["1","2","3","4","5","6","ESPECIALES"],
+  unico: ["UNICO"],
+  boxer: ["M","L","XL","XXL","XXXL","XXXXL"]
+};
+
+// 2) Detectar esquema según categoría/nombre (simple pero efectivo)
+function esquemaPorCategoria(cat = "", nombre = "") {
+  const c = (cat || "").toLowerCase();
+  const n = (nombre || "").toLowerCase();
+
+  // accesorios
+  if (c.includes("media") || n.includes("media")) return ESQUEMAS_TALLES.unico;
+
+  // boxer
+  if (c.includes("boxer") || n.includes("boxer")) return ESQUEMAS_TALLES.boxer;
+
+  // deportivo 1..6
+  if (c.includes("deportivo") || n.includes("lycra") || n.includes("microfibra") || n.includes("acetato") || n.includes("termica")) {
+    return ESQUEMAS_TALLES.numeros_1_6;
+  }
+
+  // ✅ ACA PEGÁS ESTO
+  if (c.includes("camisa") || n.includes("camisa") || n.includes("lino")) {
+    return ESQUEMAS_TALLES.numeros_1_6;
+  }
+
+  // pantalones/jeans/bermudas (38..48 + especiales)
+  if (
+    c.includes("pantal") || c.includes("jean") || c.includes("berm") ||
+    n.includes("pantal") || n.includes("jean") || n.includes("berm")
+  ) return ESQUEMAS_TALLES.numeros_pantalon;
+
+  // default ropa letras
+  return ESQUEMAS_TALLES.letras_ropa;
 }
+
+function obtenerListaTallesPorSelector() {
+  const modo = (selectTipoTalles?.value || "auto");
+
+  if (modo === "auto") {
+    return esquemaPorCategoria(inputCategoria.value, inputNombre.value);
+  }
+  return ESQUEMAS_TALLES[modo] || ESQUEMAS_TALLES.letras_ropa;
+}
+
+// 3) Render inputs de stock según lista de talles
+function renderStockInputs(tallesList, valores = {}) {
+  if (!stockInputsWrap) return;
+  stockInputsWrap.innerHTML = "";
+
+  tallesList.forEach(t => {
+    const key = String(t).toUpperCase();
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.autocomplete = "off";
+    input.placeholder = key;
+    input.dataset.talle = key;
+   const val = Number(valores?.[key] ?? "");
+input.value = val > 0 ? val : "";
+
+
+    input.style.width = "80px";
+    input.style.padding = "8px";
+    input.style.border = "1px solid #ccc";
+    input.style.borderRadius = "8px";
+
+    stockInputsWrap.appendChild(input);
+  });
+}
+
+
+// 4) Leer inputs dinámicos y devolver objeto talles {TALLE: stock}
+function leerTallesDesdeInputs() {
+  const out = {};
+  if (!stockInputsWrap) return out;
+
+  stockInputsWrap.querySelectorAll("input[data-talle]").forEach(inp => {
+    const t = inp.dataset.talle;
+    out[t] = Number(inp.value) || 0;
+  });
+
+  return out;
+}
+
 
 
 /* ================= ABRIR / CERRAR MODAL PRODUCTO ================= */
+/* ================= ABRIR / CERRAR MODAL PRODUCTO ================= */
+function generoDesdeId(id) {
+  const x = String(id || "").toUpperCase();
+  if (x.startsWith("H/")) return "H";
+  if (x.startsWith("M/")) return "M";
+  return "H";
+}
+
 function abrirModal(producto = null) {
-    modal.classList.remove("oculto");
+  modal.classList.remove("oculto");
 
-    errorNombre.innerText = "";
-    errorPrecio.innerText = "";
-    errorCategoria.innerText = "";
+  errorNombre.innerText = "";
+  errorPrecio.innerText = "";
+  errorCategoria.innerText = "";
+  errorPrecioCompra.innerText = "";
 
-    if (producto) {
-        // EDITAR
-        tituloModal.innerText = "Editar Producto";
-        inputId.value = producto.id;
-        inputId.disabled = true;
-        inputNombre.value = producto.nombre;
-        inputPrecio.value = producto.precio;
-        inputCategoria.value = producto.categoria;
-        inputPrecioCompraa.value = producto.precioCompra ?? "";
+  if (producto) {
+    // EDITAR
+    tituloModal.innerText = "Editar Producto";
 
-        stockS.value = producto.talles.S;
-        stockM.value = producto.talles.M;
-        stockL.value = producto.talles.L;
-        stockXL.value = producto.talles.XL;
-
-        productoEditando = producto;
-    } else {
-    // NUEVO PRODUCTO
-    tituloModal.innerText = "Agregar Producto";
-    inputId.value = generarID();
+    inputGenero.value = generoDesdeId(producto.id);
+    inputId.value = producto.id;
     inputId.disabled = true;
+
+    inputNombre.value = producto.nombre || "";
+    inputPrecio.value = producto.precio ?? "";
+    inputPrecioCompraa.value = producto.precioCompra ?? "";
+    inputCategoria.value = producto.categoria || "";
+
+    if (selectTipoTalles) {
+  selectTipoTalles.value = "auto";
+  selectTipoTalles.disabled = true; // para no romper talles existentes
+}
+
+    // ✅ SI EL PRODUCTO YA TIENE TALLES, USO ESOS (NO INVENTO OTROS)
+    const tallesExistentes = Object.keys(producto.talles || {});
+    const lista = tallesExistentes.length
+      ? ordenarTalles(tallesExistentes)
+      : esquemaPorCategoria(producto.categoria, producto.nombre);
+
+    renderStockInputs(lista, producto.talles || {});
+    productoEditando = producto;
+
+  } else {
+    // NUEVO
+    tituloModal.innerText = "Agregar Producto";
+inputId.value = generarID();
+inputId.disabled = true;
+
     inputNombre.value = "";
     inputPrecio.value = "";
-    inputCategoria.value = "";
-    productoEditando = null;
     inputPrecioCompraa.value = "";
+    inputCategoria.value = "";
+
+    if (selectTipoTalles) selectTipoTalles.disabled = false;
+
+    renderStockInputs(obtenerListaTallesPorSelector(), {});
+    productoEditando = null;
+  }
+
+  // Cuando elijo un tipo de talle, rearmo inputs
+selectTipoTalles?.addEventListener("change", () => {
+  if (productoEditando) return; // si estás editando, no tocamos
+  renderStockInputs(obtenerListaTallesPorSelector(), leerTallesDesdeInputs());
+});
+
+// Si está en AUTO, al escribir nombre/categoría se adapta
+function refrescarAutoTalles() {
+  if (productoEditando) return;
+  if (!selectTipoTalles) return;
+  if (selectTipoTalles.value !== "auto") return;
+
+  renderStockInputs(obtenerListaTallesPorSelector(), leerTallesDesdeInputs());
 }
+
+inputCategoria?.addEventListener("input", refrescarAutoTalles);
+inputNombre?.addEventListener("input", refrescarAutoTalles);
+
+
+// si cambiás Hombre/Mujer mientras creás producto nuevo, regenero ID
+inputGenero?.addEventListener("change", () => {
+  if (productoEditando) return; // si estás editando, no tocar ID
+  inputId.value = generarID(inputGenero.value);
+});
+
+
+btnCancelar.addEventListener("click", () => {
+  modal.classList.add("oculto");
+  productoEditando = null;
+  limpiarStockInputs();
+});
 
 
     inputNombre.focus();
@@ -256,95 +423,91 @@ function cerrarModal() {
     modal.classList.add("oculto");
 }
 
+function ordenarTalles(arr = []) {
+  const a = (arr || []).map(x => String(x).toUpperCase().trim()).filter(Boolean);
+
+  const especiales = a.filter(x => x === "ESPECIALES");
+  const unicos = a.filter(x => x === "UNICO");
+
+  const resto = a.filter(x => x !== "ESPECIALES" && x !== "UNICO");
+
+  const nums = resto.filter(x => /^\d+$/.test(x)).sort((x,y)=> Number(x)-Number(y));
+  const otros = resto.filter(x => !/^\d+$/.test(x)).sort();
+
+  // orden: números -> otros -> UNICO -> ESPECIALES
+  return [...nums, ...otros, ...unicos, ...especiales];
+}
+
 function existeProducto(nombre, ignorarId = null) {
   return stock.productos.some(p =>
     p.id !== ignorarId &&
     p.nombre.trim().toLowerCase() === nombre.trim().toLowerCase());
 }
 
-/* ================= GUARDAR PRODUCTO ================= */
-btnGuardar.addEventListener("click", () => {
-    let valid = true;
+inputCategoria.addEventListener("input", () => {
+  // si estás editando, NO te rompo los talles existentes
+  if (productoEditando) return;
 
-    errorNombre.innerText = "";
-    errorPrecio.innerText = "";
-    errorCategoria.innerText = "";
-    errorPrecioCompra.innerText = "";
-
-
-    const id = inputId.value;
-    const nombre = inputNombre.value.trim();
-    const precio = Number(inputPrecio.value);
-    const precioCompra = Number(inputPrecioCompraa.value);
-    const categoria = inputCategoria.value.trim();
-
-    const talles = {
-        S: Number(stockS.value) || 0,
-        M: Number(stockM.value) || 0,
-        L: Number(stockL.value) || 0,
-        XL: Number(stockXL.value) || 0
-    };
-
-    // Validaciones
-    if (!nombre || !/^[a-zA-Z\s]+$/.test(nombre)) {
-        errorNombre.innerText = "Nombre inválido";
-        valid = false;
-    }
-
-    if (isNaN(precio) || precio <= 0) {
-        errorPrecio.innerText = "Precio inválido";
-        valid = false;
-    }
-
-    if (isNaN(precioCompra) || precioCompra < 0) {
-    errorPrecioCompra.innerText = "Precio de compra inválido";
-    valid = false;
-    }
-
-    if (!isNaN(precioCompra) && precioCompra > 0 && precioCompra >= precio) {
-    errorPrecio.innerText = "Venta debe ser mayor a compra";
-    valid = false;
-    }
-
-    if (!categoria) {
-        errorCategoria.innerText = "Categoría requerida";
-        valid = false;
-    }
-
-    if (!valid) return;
-
-    // 🚨 Validación duplicado (antes de guardar)
-    const idActual = productoEditando ? productoEditando.id : null;
-    if (existeProducto(nombre, idActual)) {
-        alert("Ese producto ya existe");
-        return;
-    }
-
-
-    if (productoEditando) {
-        // Editar producto
-        productoEditando.nombre = nombre;
-        productoEditando.precio = precio;
-        productoEditando.precioCompra = precioCompra;
-        productoEditando.categoria = categoria.toLowerCase();
-        productoEditando.talles = talles; // actualizar stock
-    } else {
-        // Nuevo producto
-        stock.agregarProducto(
-            new Producto(id, nombre, precio,precioCompra, talles, categoria )
-        );
-    }
-
-    
-
-    limpiarStockTalles(); 
-    cerrarModal();
-    renderProductos();
-    actualizarListaCategorias();
-    actualizarProductosSugerencias();
-
+  const esquema = esquemaPorCategoria(inputCategoria.value, inputNombre.value);
+  renderStockInputs(esquema, leerTallesDesdeInputs()); // conserva lo que ya escribió
 });
 
+inputNombre.addEventListener("input", () => {
+  if (productoEditando) return;
+  const esquema = esquemaPorCategoria(inputCategoria.value, inputNombre.value);
+  renderStockInputs(esquema, leerTallesDesdeInputs());
+});
+
+/* ================= GUARDAR PRODUCTO ================= */
+btnGuardar.onclick = guardarProducto;
+
+function guardarProducto() {
+  let valid = true;
+
+  errorNombre.innerText = "";
+  errorPrecio.innerText = "";
+  errorCategoria.innerText = "";
+  errorPrecioCompra.innerText = "";
+
+  const id = inputId.value.trim();
+  const nombre = inputNombre.value.trim();
+  const precio = Number(inputPrecio.value);
+  const precioCompra = Number(inputPrecioCompraa.value);
+  const categoria = inputCategoria.value.trim();
+  const talles = leerTallesDesdeInputs();
+
+  // Validaciones básicas
+  if (!nombre) { errorNombre.innerText = "Nombre inválido"; valid = false; }
+  if (isNaN(precio) || precio <= 0) { errorPrecio.innerText = "Precio inválido"; valid = false; }
+  if (isNaN(precioCompra) || precioCompra < 0) { errorPrecioCompra.innerText = "Compra inválida"; valid = false; }
+  if (!categoria) { errorCategoria.innerText = "Categoría requerida"; valid = false; }
+
+  if (!valid) return;
+
+  // ✅ SOLO validar nombre repetido si VOS QUERÉS bloquearlo
+  // (si no querés bloquear nombres repetidos, borrá este bloque)
+  const idActual = productoEditando ? productoEditando.id : null;
+  if (existeProducto(nombre, idActual)) {
+    alert("Ese producto ya existe");
+    return;
+  }
+
+  if (productoEditando) {
+    productoEditando.nombre = nombre;
+    productoEditando.precio = precio;
+    productoEditando.precioCompra = precioCompra;
+    productoEditando.categoria = categoria.toLowerCase();
+    productoEditando.talles = talles;
+  } else {
+    const ok = stock.agregarProducto(new Producto(id, nombre, precio, precioCompra, talles, categoria));
+    if (!ok) return; // stock.agregarProducto ya alerta “El ID ya existe”
+  }
+
+  cerrarModal();
+  renderProductos();
+  actualizarListaCategorias();
+  actualizarProductosSugerencias?.();
+}
 
 /* ================= BOTONES PRINCIPALES ================= */
 btnCancelar.addEventListener("click", cerrarModal);
@@ -381,17 +544,7 @@ const errorStock = document.getElementById("errorStock");
 const btnConfirmarStock = document.getElementById("btnConfirmarStock");
 const btnCancelarStock = document.getElementById("btnCancelarStock");
 
-let productoStockActual = null;
-let talleStockActual = null;
-
-function abrirModalStock() {
-    modalStock.classList.remove("oculto");
-    errorStock.innerText = "";
-    inputCantidadStock.value = "";
-    stockInfo.innerText = `Producto: ${productoStockActual.nombre} | Talle: ${talleStockActual}`;
-    inputCantidadStock.focus();
-}
-
+let productoStockActual = null;let talleStockActual = null;
 
 function cerrarModalStock() {
     modalStock.classList.add("oculto");
@@ -801,15 +954,19 @@ btnConfirmarVenta.addEventListener("click", () => {
     const ads = document.getElementById("inputAds").value.trim();
 
     if (!nombre) return alert("El nombre del cliente es obligatorio");
-    if (!email) return alert("El email del cliente es obligatorio");
-    if (!telefonoMinimoOk(8)) {
-        alert("Teléfono muy corto (mínimo 8 dígitos).");
-        return;
-    }
-
-    // Validación básica de email
+    if (email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) return alert("Ingrese un email válido");
+  }
+     const telDigits = telefono.replace(/\D/g, "");
+  if (telDigits.length > 0 && telDigits.length < 8) {
+    alert("Teléfono muy corto (mínimo 8 dígitos).");
+    return;
+  }
+    const dniDigits = ads.replace(/\D/g, "");
+  if (dniDigits.length > 0 && (dniDigits.length < 7 || dniDigits.length > 10)) {
+    return alert("DNI inválido (7 a 10 dígitos).");
+  }
 
     if (carrito.length === 0) return alert("Debe agregar productos al carrito");
 
@@ -827,6 +984,7 @@ btnConfirmarVenta.addEventListener("click", () => {
             precio: item.producto.precio,
             cantidad: item.cantidad
         })),
+        pagoMixto: window.__ventaPagoMixto || null,
         subtotal: parseMoneyAR(subtotalSpan.innerText),
         total: parseMoneyAR(totalVentaSpan.innerText),
         formaPago: selectPago.value,
@@ -835,11 +993,29 @@ btnConfirmarVenta.addEventListener("click", () => {
         descuento: Number(inputDescuento.value) || 0,
         fecha: new Date()
     };
+    
+    if (selectPago.value === "cuenta-corriente") {
+  const clienteId = cc_upsertCliente({
+    nombre,
+    tel: telefono,
+    email
+  });
+
+  cc_addCargo(
+    clienteId,
+    venta.total,
+    `Venta #${venta.id}`,
+    venta.id
+  );
+}
 
     ventas.push(venta);
     localStorage.setItem("ventas_v1", JSON.stringify(ventas));
-    registrarVentaEnCaja(venta);
-    renderCaja();
+
+    if (selectPago.value !== "cuenta-corriente") {
+      registrarVentaEnCaja(venta);
+      renderCaja();
+    }
 
     // Reducir stock
     carrito.forEach(item => {
@@ -957,43 +1133,114 @@ document.addEventListener("keydown", e => {
     if (e.key === "Escape") calculadora.classList.add("oculto");
 });
 
-
-
-
-// Renderizar lista de categorías y subcategorías
-function actualizarListaCategorias() {
-    listaCategorias.innerHTML = "";
-
-    const categorias = [...new Set(
-        stock.productos
-            .map(p => p.categoria)
-            .filter(c => c && c.trim() !== "")
-    )];
-
-    categorias.forEach(cat => {
-        const li = document.createElement("li");
-        li.textContent = capitalizarTexto(cat);
-
-        li.addEventListener("click", () => {
-            const filtrados = stock.productos.filter(p => p.categoria === cat);
-
-            renderProductosFiltrados(filtrados);
-
-            seccionProductos.classList.remove("oculto");
-            btnVerProductosText.textContent = "Ocultar productos";
-
-            listaCategorias.classList.add("oculto");
-        });
-
-        listaCategorias.appendChild(li);
-    });
+// ================= FILTRO: HOMBRE/MUJER -> CATEGORÍA =================
+// 2) Helper: sacar género desde el ID tipo "H/1000" o "M/2000"
+function getGeneroDesdeId(id) {
+  const s = String(id || "").trim().toUpperCase();
+  const m = s.match(/^([HM])\s*\//); // H/ o M/
+  return m ? m[1] : null;
 }
 
-btnFiltroCategorias.addEventListener("click", e => {
-    e.stopPropagation();
+// 3) Categorías únicas por género (H o M)
+function obtenerCategoriasPorGenero(genero) {
+  const cats = stock.productos
+    .filter(p => getGeneroDesdeId(p.id) === genero)
+    .map(p => (p.categoria || "").trim().toLowerCase())
+    .filter(c => c);
+
+  return Array.from(new Set(cats)).sort((a, b) => a.localeCompare(b));
+}
+
+let filtroGenero = null; // "H" | "M" | null
+
+function productoEsDeGenero(p, gen) {
+  if (!gen) return true;
+  const id = String(p.id || "").toUpperCase();
+  return id.startsWith(gen + "/");
+}
+
+function actualizarListaCategorias() {
+  listaCategorias.innerHTML = "";
+
+  // 1) Si todavía NO elegiste género -> mostrar Hombre/Mujer/Todos
+  if (!filtroGenero) {
+    const opciones = [
+      { key: "H", label: "Hombre" },
+      { key: "M", label: "Mujer" },
+      { key: "ALL", label: "Todos" },
+    ];
+
+    opciones.forEach(op => {
+      const li = document.createElement("li");
+      li.textContent = op.label;
+      li.addEventListener("click", () => {
+        filtroGenero = (op.key === "ALL") ? "ALL" : op.key;
+        actualizarListaCategorias();
+      });
+      listaCategorias.appendChild(li);
+    });
+
+    return;
+  }
+
+  // 2) Botón volver
+  const liBack = document.createElement("li");
+  liBack.textContent = "← Volver (Hombre/Mujer)";
+  liBack.style.fontWeight = "bold";
+  liBack.addEventListener("click", () => {
+    filtroGenero = null;
     actualizarListaCategorias();
-    listaCategorias.classList.toggle("oculto");
+  });
+  listaCategorias.appendChild(liBack);
+
+  // 3) Categorías según género
+  const gen = (filtroGenero === "ALL") ? null : filtroGenero;
+
+  const cats = Array.from(
+    new Set(
+      (stock.productos || [])
+        .filter(p => productoEsDeGenero(p, gen))
+        .map(p => (p.categoria || "").trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  cats.forEach(cat => {
+    const li = document.createElement("li");
+    li.textContent = capitalizarTexto(cat);
+
+    li.addEventListener("click", () => {
+      const filtrados = (stock.productos || []).filter(p =>
+        productoEsDeGenero(p, gen) && String(p.categoria || "").trim() === cat
+      );
+
+      renderProductosFiltrados(filtrados);
+
+      seccionProductos.classList.remove("oculto");
+      btnVerProductosText.textContent = "Ocultar productos";
+      listaCategorias.classList.add("oculto");
+    });
+
+    listaCategorias.appendChild(li);
+  });
+}
+
+
+// Abrir/cerrar dropdown
+btnFiltroCategorias.addEventListener("click", (e) => {
+  e.stopPropagation();
+  actualizarListaCategorias();
+  listaCategorias.classList.toggle("oculto");
 });
+
+// Cerrar si clickeás afuera
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".filtro-categorias-wrapper")) {
+    listaCategorias.classList.add("oculto");
+  }
+});
+
+
 
 document.addEventListener("click", e => {
     if (!e.target.closest(".filtro-categorias-wrapper")) {
@@ -1005,15 +1252,24 @@ document.getElementById("listaCategorias")?.addEventListener("click", (e) => {
   const li = e.target.closest("li");
   if (!li) return;
 
-  const cat = li.textContent.trim();
-  if (!cat) return;
+  // ignoro el "volver"
+  const txt = li.textContent.trim();
+  if (!txt || txt.startsWith("←")) return;
 
-  // cerrar lista
-  document.getElementById("listaCategorias").classList.add("oculto");
+  // si todavía estás en Hombre/Mujer/Todos, no filtro acá
+  if (txt === "Hombre" || txt === "Mujer" || txt === "Todos") return;
 
-  // ir a productos
-  irASeccionProductos();
-  document.getElementById("inputBuscar").value = cat; 
+  // filtro por categoría elegida
+  const cat = txt.toLowerCase();
+  const filtrados = (stock.productos || []).filter(p =>
+    String(p.categoria || "").toLowerCase().trim() === cat
+  );
+
+  renderProductosFiltrados(filtrados);
+
+  seccionProductos.classList.remove("oculto");
+  btnVerProductosText.textContent = "Ocultar productos";
+  listaCategorias.classList.add("oculto");
 });
 
 // Mostrar sección de productos y hacer scroll
@@ -1098,6 +1354,8 @@ function cargarSugerenciasProductosCompra() {
         li.addEventListener("click", () => {
             inputProductoCompra.value = `${p.id} - ${p.nombre}`;
             sugerenciasProductosCompra.classList.add("oculto");
+             compraSel = p;               
+             renderCompraTallesInputs(p); 
         });
         sugerenciasProductosCompra.appendChild(li);
     });
@@ -1118,35 +1376,35 @@ btnAgregarProductoCompra.addEventListener("click", () => {
 });
 
 function agregarProductoCompra() {
-    const valor = inputProductoCompra.value.trim();
-    if (!valor) return alert("Seleccioná un producto");
+  const valor = inputProductoCompra.value.trim();
+  if (!valor) return alert("Seleccioná un producto");
 
-    const idProducto = valor.split(" - ")[0];
-    const producto = stock.productos.find(p => p.id === idProducto);
-    if (!producto) return alert("Producto no encontrado");
+  const idProducto = valor.split(" - ")[0];
+  const producto = stock.productos.find(p => p.id === idProducto);
+  if (!producto) return alert("Producto no encontrado");
 
-    const talles = {
-        S: Number(inputCompraS.value) || 0,
-        M: Number(inputCompraM.value) || 0,
-        L: Number(inputCompraL.value) || 0,
-        XL: Number(inputCompraXL.value) || 0
-    };
+  // ✅ LEER PRIMERO lo que el usuario escribió (sin re-render)
+  const talles = leerTallesCompraDesdeUI();
 
-    if (Object.values(talles).every(c => c === 0)) {
-        return alert("Ingresá al menos una cantidad");
-    }
+  if (Object.values(talles).every(c => Number(c || 0) === 0)) {
+    return alert("Ingresá al menos una cantidad");
+  }
 
-    const totalUnidades = Object.values(talles).reduce((a, b) => a + b, 0);
+  const totalUnidades = Object.values(talles).reduce((a, b) => a + Number(b || 0), 0);
 
-    productosCompra.push({
-        id: producto.id,
-        nombre: producto.nombre,
-        talles,
-        totalUnidades
-    });
+  productosCompra.push({
+    id: producto.id,
+    nombre: producto.nombre,
+    talles,
+    totalUnidades
+  });
 
-    mostrarResumenCompra();
-    limpiarInputsProductoCompra();
+  mostrarResumenCompra();
+
+  // limpiar para el próximo producto
+  inputProductoCompra.value = "";
+  limpiarTallesCompraUI();
+  sugerenciasProductosCompra.classList.add("oculto");
 }
 
 function mostrarResumenCompra() {
@@ -1169,49 +1427,85 @@ function mostrarResumenCompra() {
                 tbody.appendChild(tr);
             }
         });
-    });
-}
-
+    });}
 
 function limpiarInputsProductoCompra() {
     inputProductoCompra.value = "";
-    inputCompraS.value = inputCompraM.value = inputCompraL.value = inputCompraXL.value = "";
+    limpiarTallesCompraUI();
     sugerenciasProductosCompra.innerHTML = "";
 }
 
+let compraSel = null;
+
+function renderCompraTallesInputs(producto) {
+  const cont = document.getElementById("compraTallesInputs");
+  if (!cont) return;
+
+  cont.innerHTML = "";
+
+  const talles = producto?.talles ? Object.keys(producto.talles) : [];
+  const ordenados = ordenarTalles(talles);
+
+  if (ordenados.length === 0) {
+    cont.innerHTML = `<div class="small-muted">Este producto no tiene talles cargados.</div>`;
+    return;
+  }
+
+  ordenados.forEach(t => {
+    const inp = document.createElement("input");
+    inp.type = "number";
+    inp.min = "0";
+    inp.placeholder = t;
+    inp.dataset.talle = t;
+    inp.style.width = "70px";
+    inp.style.padding = "8px";
+    inp.style.border = "1px solid #ccc";
+    inp.style.borderRadius = "8px";
+    cont.appendChild(inp);
+  });
+}
+
+function leerTallesCompraDesdeUI() {
+  const cont = document.getElementById("compraTallesInputs");
+  if (!cont) return {};
+
+  const out = {};
+  cont.querySelectorAll("input[data-talle]").forEach(inp => {
+    const t = inp.dataset.talle;
+    const n = Number(inp.value || 0);
+    out[t] = Number.isFinite(n) ? n : 0;
+  });
+  return out;
+}
+
+function limpiarTallesCompraUI() {
+  const cont = document.getElementById("compraTallesInputs");
+  if (!cont) return;
+  cont.querySelectorAll("input[data-talle]").forEach(inp => (inp.value = ""));
+}
 
 /* ====== GUARDAR COMPRA ====== */
 const btnGuardarCompra = document.getElementById("btnGuardarCompra");
 
-if (btnGuardarCompra) {
-  btnGuardarCompra.addEventListener("click", () => {
-
-    // ✅ si no agregaste productos
+if (btnGuardarCompra) {  btnGuardarCompra.addEventListener("click", () => {
     if (productosCompra.length === 0) {
       alert("No agregaste productos a la compra");
-      return;
-    }
-
-    // ✅ Actualizar stock con TODOS los productos agregados
+      return;    }
     productosCompra.forEach(item => {
       const producto = stock.productos.find(p => p.id === item.id);
       if (!producto) return;
 
       Object.keys(item.talles).forEach(talle => {
-        producto.talles[talle] += item.talles[talle];
-      });
-    });
-
-    // ✅ Guardar compra (sin proveedor)
+  if (producto.talles[talle] == null) producto.talles[talle] = 0;
+  producto.talles[talle] += item.talles[talle];
+});    });
    compras.push({
   total: Number(document.getElementById("precioCompra").value) || 0,
   fecha: new Date(),
   productos: productosCompra
 });
 
-    alert("Compra registrada y stock actualizado ✅");
-
-    // ✅ Limpiar todo
+    alert("Compra registrada y stock actualizado");
     productosCompra = [];
     mostrarResumenCompra();
 
@@ -1233,6 +1527,15 @@ function ocultarTodasLasSecciones() {
     document.querySelectorAll(".main-content section").forEach(sec => {
         sec.classList.add("oculto");
     });
+
+    // 🔧 FIX BOTÓN PRODUCTOS
+  const btnVerProductos = document.getElementById("btnVerProductos");
+  const btnVerProductosText = btnVerProductos?.querySelector("span");
+  const seccionProductos = document.getElementById("seccionProductos");
+
+  if (seccionProductos?.classList.contains("oculto") && btnVerProductosText) {
+    btnVerProductosText.textContent = "Productos";
+  }
 }
 
 // ================= CAJA (LOCALSTORAGE) =================
@@ -1403,6 +1706,21 @@ if (formMovCaja){
     const desc = document.getElementById("movDesc").value.trim();
     const montoRaw = Number(document.getElementById("movMonto").value || 0);
 
+    // 👉 Pago de Cuenta Corriente
+if (tipo === "INGRESO" && chkPagoCC?.checked) {
+  if (!clienteIdSeleccionado) {
+    alert("Seleccioná un cliente de Cuenta Corriente");
+    return;
+  }
+
+  cc_addPago(
+    clienteIdSeleccionado,
+    montoRaw,
+    medio,
+    desc || "Pago cuenta corriente"
+  );
+}
+
     if (montoRaw <= 0) return alert("Monto inválido.");
 
     const signed = (tipo === "INGRESO") ? montoRaw : -montoRaw;
@@ -1417,6 +1735,15 @@ if (formMovCaja){
       medio_pago: medio
     });
 
+    // 👉 Si es un INGRESO y corresponde a Cuenta Corriente
+if (tipo === "INGRESO" && window.esPagoCuentaCorriente === true) {
+  cc_addPago(
+    window.clienteIdSeleccionado,
+    montoRaw,
+    medio,
+    desc || "Pago cuenta corriente"
+  );
+}
     saveCaja(state);
 
     // limpiar
@@ -1676,23 +2003,26 @@ function filtrarPorModo(arr, modo, refDate) {
     return true;
   });
 }
-
+  
 function resetearReportes() {
-  if (!confirm("¿Borrar TODAS las ventas y reiniciar reportes?")) return;
+  const ok = confirm(
+    "¿Borrar TODAS las ventas y compras y reiniciar reportes?\n\n" +
+    "- Ventas (ventas_v1)\n" +
+    "- Compras (compras_v1)\n"
+  );
+  if (!ok) return;
 
-  // borrar localStorage
   localStorage.removeItem("ventas_v1");
+  localStorage.removeItem("compras_v1"); 
 
-  // resetear variable en memoria
   ventas = [];
+  compras = []; 
 
-  // refrescar reporte en pantalla si estás en reportes
   if (typeof cargarReporte === "function") {
     cargarReporte(document.getElementById("selectModoReporte")?.value || "dia");
   }
-
-  
 }
+
 
 function resetearCaja() {
   if (!confirm("¿Borrar TODA la información de la caja y empezar de cero?")) return;
@@ -1780,6 +2110,36 @@ function rangoPorPeriodo(periodo){
   }
   return {inicio, fin, label};
 }
+
+const DASH_LIMIT = 5;
+const dashExpand = { mix:false, top:false, stock:false, act:false };
+
+function setToggleState(btnId, expanded, total) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+
+  if ((total || 0) <= DASH_LIMIT) {
+    btn.classList.add("oculto");
+    return;
+  }
+  btn.classList.remove("oculto");
+  btn.textContent = expanded ? "Menos" : "Más";
+}
+
+function wireDashboardToggles() {
+  const bMix = document.getElementById("dashToggleMix");
+  const bTop = document.getElementById("dashToggleTop");
+  const bSto = document.getElementById("dashToggleStock");
+  const bAct = document.getElementById("dashToggleAct");
+
+  bMix?.addEventListener("click", () => { dashExpand.mix = !dashExpand.mix; renderDashboard(); });
+  bTop?.addEventListener("click", () => { dashExpand.top = !dashExpand.top; renderDashboard(); });
+  bSto?.addEventListener("click", () => { dashExpand.stock = !dashExpand.stock; renderDashboard(); });
+  bAct?.addEventListener("click", () => { dashExpand.act = !dashExpand.act; renderDashboard(); });
+}
+
+// llamalo una vez al cargar
+document.addEventListener("DOMContentLoaded", wireDashboardToggles);
 
 function renderDashboard(){
   const periodo = document.getElementById("dashPeriodo")?.value || "mes";
@@ -1896,8 +2256,10 @@ function renderDashboard(){
     bars.innerHTML = `<div class="small-muted">Sin ventas en el período.</div>`;
     tbMix.innerHTML = `<tr><td colspan="3" class="small-muted">Sin datos</td></tr>`;
   } else {
+    const mixVisible = dashExpand.mix ? mixArr : mixArr.slice(0, DASH_LIMIT);
+setToggleState("dashToggleMix", dashExpand.mix, mixArr.length);
     const max = Math.max(...mixArr.map(x=> x.total));
-    mixArr.forEach(x=>{
+    mixVisible.forEach(x=>{
       const pct = totalMix ? (x.total/totalMix*100) : 0;
       const w = max ? (x.total/max*100) : 0;
 
@@ -1926,7 +2288,10 @@ function renderDashboard(){
   if (!topProductos.length){
     topBody.innerHTML = `<tr><td colspan="3" class="text-center small-muted" style="padding:18px;">Sin ventas en el período.</td></tr>`;
   } else {
-    topProductos.forEach(p=>{
+    setToggleState("dashToggleTop", dashExpand.top, topProductos.length);
+    const topVisible = dashExpand.top ? topProductos : topProductos.slice(0, DASH_LIMIT);
+
+    topVisible.forEach(p=>{
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td><b>${p.nombre}</b></td>
@@ -1943,7 +2308,10 @@ function renderDashboard(){
   if (!criticos.length){
     stockBody.innerHTML = `<tr><td colspan="3" class="text-center small-muted" style="padding:18px;">Sin alertas (o no hay stock cargado).</td></tr>`;
   } else {
-    criticos.slice(0, 12).forEach(c=>{
+    setToggleState("dashToggleStock", dashExpand.stock, criticos.length);
+    const critVisible = dashExpand.stock ? criticos : criticos.slice(0, DASH_LIMIT);
+
+    critVisible.slice(0, 12).forEach(c=>{
       const badge = (c.stock === 0)
         ? `<span class="badge badge-warning">SIN</span>`
         : `<span class="badge badge-primary">BAJO</span>`;
@@ -1963,7 +2331,10 @@ function renderDashboard(){
   if (!movsOrdenados.length){
     actBody.innerHTML = `<tr><td colspan="5" class="text-center small-muted" style="padding:18px;">Sin movimientos todavía.</td></tr>`;
   } else {
-    movsOrdenados.forEach(m=>{
+    setToggleState("dashToggleAct", dashExpand.act, movsOrdenados.length);
+    const actVisible = dashExpand.act ? movsOrdenados : movsOrdenados.slice(0, DASH_LIMIT);
+
+    actVisible.forEach(m=>{
       const tipo = m.tipo || (m.monto >= 0 ? "INGRESO" : "EGRESO");
       const badge = (tipo==="VENTA") ? `<span class="badge badge-success">VENTA</span>`
                   : (tipo==="INGRESO") ? `<span class="badge badge-primary">INGRESO</span>`
@@ -2079,7 +2450,8 @@ function telefonoMinimoOk(min = 8) {
   const infoEl = document.getElementById("loginInfo");
   const btnLogin = document.getElementById("btnLogin");
   const btnLogout = document.getElementById("btnLogout");
-
+  const user = loginUser.value.trim();
+  const pass = loginPass.value.trim();
   const togglePass = document.getElementById("togglePass");
 
 if (togglePass && passEl) {
@@ -2108,6 +2480,14 @@ if (togglePass && passEl) {
       appRoot.classList.remove("app-locked");
     }
   }
+
+  const role = sessionStorage.getItem("auth_role_v1");
+
+if (role === "empleado") {
+  document.body.classList.add("modo-empleado");
+} else {
+  document.body.classList.remove("modo-empleado");
+}
 
   function getLockState(){
     try { return JSON.parse(localStorage.getItem(LS_LOCK) || "null"); }
@@ -2241,15 +2621,28 @@ if (togglePass && passEl) {
     userEl.focus();
   }
 
-  btnLogin.addEventListener("click", async () => {
-    btnLogin.disabled = true;
-    try {
-      const ok = await verifyLogin();
-      if (ok) setLockedUI(false);
-    } finally {
-      btnLogin.disabled = false;
-    }
-  });
+  btnLogin.addEventListener("click", () => {
+  const user = loginUser.value.trim();
+  const pass = loginPass.value.trim();
+
+  // ADMIN
+  if (user === "admin" && pass === "admin123") {
+    sessionStorage.setItem("auth_ok_v1", "1");
+    sessionStorage.setItem("auth_role_v1", "admin");
+    location.reload();
+    return;
+  }
+
+  // EMPLEADO
+  if (user === "empleado" && pass === "1234") {
+    sessionStorage.setItem("auth_ok_v1", "1");
+    sessionStorage.setItem("auth_role_v1", "empleado");
+    location.reload();
+    return;
+  }
+
+  loginError.textContent = "Usuario o contraseña incorrectos";
+});
 
   // Enter para entrar
   [userEl, passEl].forEach(el => {
@@ -2375,12 +2768,21 @@ const btnRegistrarCambioDev = document.getElementById("btnRegistrarCambioDev");
 setupBuscadorProductos("cdDevBuscarProd", "cdDevSugerencias", (p)=>{
   devSel = p;
   cdDevPrecio.value = getPrecioVentaProducto(p);
+
+  cargarTallesEnSelect(cdDevTalle, devSel);
+  cdDevTalle.value = ""; // reset
+
   recalcularDiferencia();
 });
 
-setupBuscadorProductos("cdNewBuscarProd", "cdNewSugerencias", (p)=>{
+setupBuscadorProductos("cdNewBuscarProd", "cdNewSugerencias", (p) => {
   newSel = p;
+
   cdNewPrecio.value = getPrecioVentaProducto(p);
+
+  cargarTallesEnSelect(cdNewTalle, newSel);
+  cdNewTalle.value = "";
+
   recalcularDiferencia();
 });
 
@@ -2420,6 +2822,141 @@ cdModoDiferencia?.addEventListener("change", ()=>{
     cdNotaMedio.textContent = "";
   }
 });
+
+function ordenarTalles(keys = []) {
+  // orden: numéricos primero (38, 40, 1, 2...), luego textos (S, M, XL, UNICO...)
+  return [...keys].sort((a, b) => {
+    const an = Number(a), bn = Number(b);
+    const aNum = Number.isFinite(an) && String(an) === String(a);
+    const bNum = Number.isFinite(bn) && String(bn) === String(b);
+    if (aNum && bNum) return an - bn;
+    if (aNum && !bNum) return -1;
+    if (!aNum && bNum) return 1;
+    return String(a).localeCompare(String(b));
+  });
+}
+
+function cargarTallesEnSelect(selectEl, producto) {
+  if (!selectEl) return;
+
+  const talles = producto?.talles ? Object.keys(producto.talles) : [];
+  const ordenados = ordenarTalles(talles);
+
+  selectEl.innerHTML = `<option value="">Elegir talle</option>`;
+  ordenados.forEach(t => {
+    const op = document.createElement("option");
+    op.value = t;
+    op.textContent = t;
+    selectEl.appendChild(op);
+  });
+}
+
+/* =========================
+   CUENTA CORRIENTE (v1)
+   ========================= */
+const LS_CC = "cuenta_corriente_v1";
+
+// helpers
+function cc_load(){ try { return JSON.parse(localStorage.getItem(LS_CC) || "[]"); } catch { return []; } }
+function cc_save(arr){ localStorage.setItem(LS_CC, JSON.stringify(arr)); }
+
+function cc_findById(id){
+  return cc_load().find(c => c.id === id);
+}
+
+function cc_upsertCliente({ id=null, nombre="", dni="", tel="", email="" }){
+  const arr = cc_load();
+  let c = arr.find(x => x.id === id) || arr.find(x => dni && x.dni === dni) || null;
+
+  if(!c){
+    c = { id: Date.now(), nombre, dni, tel, email, movimientos: [] };
+    arr.push(c);
+  } else {
+    // actualiza datos si vinieron
+    c.nombre = nombre || c.nombre;
+    c.dni    = dni    || c.dni;
+    c.tel    = tel    || c.tel;
+    c.email  = email  || c.email;
+    c.movimientos = c.movimientos || [];
+  }
+  cc_save(arr);
+  return c.id;
+}
+
+function cc_saldo(cliente){
+  const movs = cliente.movimientos || [];
+  // CARGO suma, PAGO resta
+  return movs.reduce((acc,m)=> acc + (m.tipo==="CARGO" ? m.monto : -m.monto), 0);
+}
+
+function cc_addMovimiento(clienteId, mov){
+  const arr = cc_load();
+  const c = arr.find(x => x.id === clienteId);
+  if(!c) throw new Error("Cliente no encontrado en Cuenta Corriente");
+
+  c.movimientos = c.movimientos || [];
+  c.movimientos.unshift({
+    id: Date.now(),
+    fecha: new Date().toISOString(),
+    tipo: mov.tipo,               // "CARGO" | "PAGO"
+    monto: Number(mov.monto||0),  // siempre positivo
+    desc: mov.desc || "",
+    venta_id: mov.venta_id || null,
+    medio_pago: mov.medio_pago || null
+  });
+
+  cc_save(arr);
+  return c;
+}
+
+// Atajos
+function cc_addCargo(clienteId, monto, desc, ventaId=null){
+  return cc_addMovimiento(clienteId, { tipo:"CARGO", monto, desc, venta_id: ventaId });
+}
+
+function cc_addPago(clienteId, monto, medioPago, desc){
+  return cc_addMovimiento(clienteId, {
+    tipo: "PAGO",
+    monto: Number(monto || 0),
+    medio_pago: medioPago,
+    desc: desc || "Pago cuenta corriente"
+  });
+}
+
+// ===== UI PAGO CUENTA CORRIENTE (CAJA) =====
+let clienteIdSeleccionado = null;
+
+const chkPagoCC = document.getElementById("chkPagoCC");
+const ccBuscarCliente = document.getElementById("ccBuscarCliente");
+const ccSaldoTxt = document.getElementById("ccSaldoTxt");
+
+if (chkPagoCC && ccBuscarCliente) {
+  chkPagoCC.addEventListener("change", () => {
+    ccBuscarCliente.disabled = !chkPagoCC.checked;
+    clienteIdSeleccionado = null;
+    ccSaldoTxt.innerText = "Saldo: —";
+    ccBuscarCliente.value = "";
+  });
+
+  ccBuscarCliente.addEventListener("input", () => {
+    const txt = ccBuscarCliente.value.toLowerCase().trim();
+    if (!txt) return;
+
+    const clientes = cc_load();
+    const c = clientes.find(x =>
+      (x.nombre || "").toLowerCase().includes(txt) ||
+      (x.tel || "").includes(txt) ||
+      (x.email || "").toLowerCase().includes(txt) ||
+      (x.dni || "").includes(txt)
+    );
+
+    if (!c) return;
+
+    clienteIdSeleccionado = c.id;
+    const saldo = cc_saldo(c);
+    ccSaldoTxt.innerText = `Saldo: $${saldo.toLocaleString("es-AR")}`;
+  });
+}
 
 /* ========= cálculo ========= */
 function recalcularDiferencia(){
@@ -2698,7 +3235,7 @@ const state = loadCaja();
   cdMotivo.value = "";
   setUIporTipo();
 
-  alert("✅ Registrado correctamente (stock actualizado).");
+  alert("Registrado correctamente (stock actualizado).");
 });
 
 // init
@@ -2848,12 +3385,36 @@ setUIporTipo();
       if (selectPago.value !== "giftcard") return;
 
       cont.innerHTML = `
-        <div style="display:grid; gap:8px;">
-          <input id="ventaGiftCodigo" class="input" placeholder="Código Gift Card (GC-XXXX)" />
-          <div class="small-muted" id="ventaGiftInfo" data-ok="0">Ingresá el código para validar saldo.</div>
-          <button id="btnValidarGiftVenta" class="btn btn-dark" type="button">Validar</button>
-        </div>
-      `;
+  <div style="display:grid; gap:8px;">
+    <input id="ventaGiftCodigo" class="input" placeholder="Código Gift Card (GC-XXXX)" autocomplete="off" />
+    <div class="small-muted" id="ventaGiftInfo" data-ok="0">Ingresá el código para validar saldo.</div>
+
+    <div id="ventaGiftRestoBox" class="oculto" style="display:grid; gap:8px;">
+      <div class="small-muted" id="ventaGiftRestoTxt">Resto a pagar: —</div>
+
+      <select id="ventaRestoMedio" class="input">
+        <option value="EFECTIVO">Efectivo</option>
+        <option value="TRANSFERENCIA">Transferencia</option>
+        <option value="QR">QR</option>
+        <option value="TARJETA_DEBITO">Tarjeta Débito</option>
+        <option value="TARJETA_CREDITO">Tarjeta Crédito</option>
+      </select>
+
+      <input id="ventaRestoCuotas" class="input oculto" type="number" min="1" value="1" placeholder="Cuotas (solo crédito)" />
+      <select id="ventaRestoBanco" class="input oculto">
+        <option value="">Elegí un banco</option>
+        <option value="BBVA">BBVA</option>
+        <option value="Santander">Santander</option>
+        <option value="Galicia">Galicia</option>
+        <option value="Macro">Macro</option>
+        <option value="Banco Nación">Banco Nación</option>
+        <option value="Mercado Pago">Mercado Pago</option>
+      </select>
+    </div>
+
+    <button id="btnValidarGiftVenta" class="btn btn-dark" type="button">Validar</button>
+  </div>
+`;
 
       document.getElementById("btnValidarGiftVenta")?.addEventListener("click", () => {
         const code = toUpperSafe(document.getElementById("ventaGiftCodigo")?.value || "");
@@ -2870,8 +3431,46 @@ setUIporTipo();
         info.textContent = `Saldo disponible: $${moneyAR(g.saldo)}`;
         info.dataset.ok = "1";
         info.dataset.code = g.codigo;
+        btnValidarGiftVenta
       });
     }
+    function getTotalVentaActual(){
+  const totalTxt = document.getElementById("totalVenta")?.innerText || "0";
+  return (typeof window.parseMoneyAR === "function")
+    ? window.parseMoneyAR(totalTxt)
+    : Number(String(totalTxt).replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")) || 0;
+}
+
+function syncRestoUI(saldoGift){
+  const total = getTotalVentaActual();
+  const resto = Math.max(0, Number(total) - Number(saldoGift || 0));
+
+  const box = document.getElementById("ventaGiftRestoBox");
+  const txt = document.getElementById("ventaGiftRestoTxt");
+  if (!box || !txt) return;
+
+  if (resto > 0){
+    box.classList.remove("oculto");
+    txt.textContent = `Resto a pagar: $${Number(resto).toLocaleString("es-AR")}`;
+  } else {
+    box.classList.add("oculto");
+    txt.textContent = "Resto a pagar: —";
+  }
+
+  // mostrar/ocultar extras según medio
+  const medioSel = document.getElementById("ventaRestoMedio");
+  const cuotasEl = document.getElementById("ventaRestoCuotas");
+  const bancoEl  = document.getElementById("ventaRestoBanco");
+
+  function refreshExtras(){
+    const m = medioSel?.value || "EFECTIVO";
+    if (cuotasEl) cuotasEl.classList.toggle("oculto", m !== "TARJETA_CREDITO");
+    if (bancoEl)  bancoEl.classList.toggle("oculto", m !== "TRANSFERENCIA");
+  }
+
+  medioSel?.addEventListener("change", refreshExtras);
+  refreshExtras();
+}
 
     selectPago.addEventListener("change", renderGiftUI);
 
@@ -2901,10 +3500,51 @@ setUIporTipo();
         : Number(String(totalTxt).replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")) || 0;
 
       if (g.saldo <= 0) { alert("Gift card sin saldo."); throw new Error("saldo 0"); }
-      if (g.saldo < total) {
-        alert(`Saldo insuficiente. Saldo: $${moneyAR(g.saldo)} | Total: $${moneyAR(total)}`);
-        throw new Error("saldo insuficiente");
-      }
+
+// cuánto usa de gift
+const usaGift = Math.min(Number(g.saldo || 0), Number(total || 0));
+const resto   = Math.max(0, Number(total || 0) - usaGift);
+
+// descuenta gift (si usa algo)
+if (usaGift > 0){
+  g.saldo = Number(g.saldo) - usaGift;
+  g.movimientos = g.movimientos || [];
+  g.movimientos.push({ fecha: nowStr(), tipo: "USO", monto: -Math.abs(usaGift), venta_total: total });
+  saveGiftCards(gcs);
+}
+
+// si queda resto, se paga con otro medio (NO error)
+if (resto > 0){
+  const medioResto = document.getElementById("ventaRestoMedio")?.value || "EFECTIVO";
+  const cuotas = Number(document.getElementById("ventaRestoCuotas")?.value || 1);
+  const banco  = document.getElementById("ventaRestoBanco")?.value || null;
+
+  // registra el resto en CAJA como INGRESO (si hay caja abierta)
+  if (typeof window.loadCaja === "function" && typeof window.saveCaja === "function") {
+    const state = window.loadCaja();
+    if (state?.abierta && state?.caja && Array.isArray(state.movimientos)) {
+      state.movimientos.push({
+        id: Date.now(),
+        caja_id: state.caja.id,
+        fecha: nowStr(),
+        tipo: "INGRESO",
+        descripcion: `Resto venta (GiftCard + ${medioResto})`,
+        monto: Math.abs(resto),
+        medio_pago: medioResto
+      });
+      window.saveCaja(state);
+      try { if (typeof window.renderCaja === "function") window.renderCaja(); } catch {}
+    }
+  }
+
+  // opcional: guardá info en la venta (si querés)
+  window.__ventaPagoMixto = {
+    gift: { codigo: code, usado: usaGift },
+    resto: { monto: resto, medio: medioResto, cuotas, banco }
+  };
+} else {
+  window.__ventaPagoMixto = { gift: { codigo: code, usado: usaGift }, resto: null };
+}
 
       g.saldo = Number(g.saldo) - Number(total);
       g.movimientos = g.movimientos || [];
@@ -3003,3 +3643,444 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 });
+
+function importarProductosBase(arr) {
+  if (!Array.isArray(arr)) return alert("JSON inválido (no es un array)");
+
+  let ok = 0, fail = 0;
+
+  arr.forEach(p => {
+    try {
+      const prod = new Producto(
+        p.id,
+        p.nombre,
+        Number(p.precio) || 0,
+        Number(p.precioCompra) || 0,
+        p.talles || {},
+        p.categoria || ""
+      );
+
+      // si ya existe, lo salteo
+      if (stock.productos.some(x => x.id === prod.id)) { fail++; return; }
+
+      stock.productos.push(prod);
+      ok++;
+    } catch(e) { fail++; }
+  });
+
+  renderProductos();
+  actualizarProductosSugerencias?.();
+
+}
+
+function categoriaDesdeDescripcion(descripcion) {
+  const clean = (descripcion || "")
+    .toString()
+    .trim()
+    .replace(/\s+/g, " ");
+
+  if (!clean) return "SIN_CATEGORIA";
+
+  // primera palabra
+  let first = clean.split(" ")[0].toUpperCase();
+
+  // normalizaciones opcionales (por si querés que quede más prolijo)
+  const map = {
+    "REMERAS": "REMERA",
+    "CAMISAS": "CAMISA",
+    "CAMPERAS": "CAMPERA",
+    "BERMUDAS": "BERMUDA",
+    "PANTALON": "PANTALÓN",
+    "PANTALONES": "PANTALÓN",
+    "JEANS": "JEAN",
+    "MEDIAS": "MEDIA",
+    "BOXERS": "BOXER",
+  };
+
+  return map[first] || first;
+}
+
+function generarJSONBaseDesdeTabla(textoPlano) {
+  const lineas = (textoPlano || "")
+    .split("\n")
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  // saltear encabezado si existe
+  const sinHeader = (lineas[0] || "").toLowerCase().includes("articulo")
+    ? lineas.slice(1)
+    : lineas;
+
+  const map = new Map();
+
+  const toNum = (v) => {
+    if (v == null) return 0;
+    const s = String(v).trim();
+    if (!s) return 0;
+    // soporta "15.000" / "15000" / "15,000" (por las dudas)
+    const n = (typeof parseMoneyAR === "function")
+      ? parseMoneyAR(s.replace(/[^\d.,-]/g, ""))
+      : Number(s.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")) || 0;
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  sinHeader.forEach(linea => {
+    // split por TAB primero, sino por 2+ espacios
+    const cols = linea.includes("\t") ? linea.split("\t") : linea.split(/\s{2,}/);
+
+    const articulo = (cols[0] || "").trim();
+    const descripcion = (cols[1] || "").trim();
+    const talle = (cols[2] || "").trim();
+
+    // columnas extra
+    const stockVal = toNum(cols[3]);       // STOCK
+    const compraVal = toNum(cols[4]);      // Precio Compra
+    const ventaVal  = toNum(cols[5]);      // Precio Venta
+
+    if (!descripcion) return;
+
+    const key = descripcion.toUpperCase();
+
+    if (!map.has(key)) {
+      const descLow = descripcion.toLowerCase();
+
+      // categoría por heurística
+     let cat = categoriaDesdeDescripcion(descripcion);
+      if (descLow.includes("jean")) cat = "Jeans";
+      else if (descLow.includes("pantal")) cat = "Pantalones";
+      else if (descLow.includes("berm")) cat = "Bermudas";
+      else if (descLow.includes("boxer")) cat = "Boxer";
+      else if (descLow.includes("media")) cat = "Medias";
+      else if (descLow.includes("camisa")) cat = "Camisas";
+      else if (descLow.includes("buzo")) cat = "Buzos";
+      else if (descLow.includes("campera")) cat = "Camperas";
+      else if (descLow.includes("remera")) cat = "Remeras";
+
+      map.set(key, {
+        id: articulo || generarID(),
+        nombre: capitalizarTexto(descripcion),
+        categoria: cat,
+        precio: ventaVal || 0,       
+        precioCompra: compraVal || 0, 
+        talles: {}
+      });
+    }
+
+    const prod = map.get(key);
+
+    // si el primero vino en 0 y aparece un valor después, lo completa
+    if ((Number(prod.precio) || 0) === 0 && ventaVal > 0) prod.precio = ventaVal;
+    if ((Number(prod.precioCompra) || 0) === 0 && compraVal > 0) prod.precioCompra = compraVal;
+
+    if (talle) {
+      const t = talle.toUpperCase();
+      prod.talles[t] = (Number(prod.talles[t] || 0) + Number(stockVal || 0));
+    }
+  });
+
+  return Array.from(map.values());
+}
+
+
+const texto = `H/1000	BERMUDAS ALGODON O WAFLE	1		5000	15000
+H/1001	BERMUDAS ALGODON O WAFLE	2		5000	15000
+H/1002	BERMUDAS ALGODON O WAFLE	3		5000	15000
+H/1003	BERMUDAS ALGODON O WAFLE	4		5000	15000
+H/1004	BERMUDAS ALGODON O WAFLE	5		5000	15000
+H/1005	BERMUDAS ALGODON O WAFLE	6		5000	15000
+H/1006	BERMUDAS ALGODON O WAFLE	ESPECIALES		5000	15000
+H/1007	BERMUDAS CARGO	38		11000	25000
+H/1008	BERMUDAS CARGO	40		11000	25000
+H/1009	BERMUDAS CARGO	42		11000	25000
+H/1010	BERMUDAS CARGO	44		11000	25000
+H/1011	BERMUDAS CARGO	46		11000	25000
+H/1012	BERMUDAS CARGO	48		11000	25000
+H/1013	BERMUDAS CORTE CHINO	38		11000	25000
+H/1014	BERMUDAS CORTE CHINO	40		11000	25000
+H/1015	BERMUDAS CORTE CHINO	42		11000	25000
+H/1016	BERMUDAS CORTE CHINO	44		11000	25000
+H/1017	BERMUDAS CORTE CHINO	46		11000	25000
+H/1018	BERMUDAS CORTE CHINO	48		11000	25000
+H/1019	BERMUDAS JEANS CORTAS	38		11000	25000
+H/1020	BERMUDAS JEANS CORTAS	40		11000	25000
+H/1021	BERMUDAS JEANS CORTAS	42		11000	25000
+H/1022	BERMUDAS JEANS CORTAS	44		11000	25000
+H/1023	BERMUDAS JEANS CORTAS	46		11000	25000
+H/1024	BERMUDAS JEANS CORTAS	48		11000	25000
+H/1025	BERMUDAS JEANS CORTAS	ESPECIALES		11000	25000
+H/1026	BERMUDAS JEANS LARGAS	38		11000	25000
+H/1027	BERMUDAS JEANS LARGAS	40		11000	25000
+H/1028	BERMUDAS JEANS LARGAS	42		11000	25000
+H/1029	BERMUDAS JEANS LARGAS	44		11000	25000
+H/1030	BERMUDAS JEANS LARGAS	46		11000	25000
+H/1031	BERMUDAS JEANS LARGAS	48		11000	25000
+H/1032	BERMUDAS JEANS LARGAS	ESPECIALES		11000	25000
+H/1033	BOXER	M		2400	5000
+H/1034	BOXER	L		2400	5000
+H/1035	BOXER	XL		2400	5000
+H/1036	BOXER	XXL		2400	5000
+H/1037	BOXER	XXXL		2400	5000
+H/1038	BOXER	XXXXL		2400	5000
+H/1039	BUZO CANGURO CON FRISA ESTAMPADO	S		17000	40000
+H/1040	BUZO CANGURO CON FRISA ESTAMPADO	M		17000	40000
+H/1041	BUZO CANGURO CON FRISA ESTAMPADO	L		17000	40000
+H/1042	BUZO CANGURO CON FRISA ESTAMPADO	XL		17000	40000
+H/1043	BUZO CANGURO CON FRISA ESTAMPADO	XXL		17000	40000
+H/1044	BUZO CANGURO CON FRISA ESTAMPADO	XXXL		17000	40000
+H/1045	BUZO CANGURO CON FRISA LISO	S		17000	40000
+H/1046	BUZO CANGURO CON FRISA LISO	M		17000	40000
+H/1047	BUZO CANGURO CON FRISA LISO	L		17000	40000
+H/1048	BUZO CANGURO CON FRISA LISO	XL		17000	40000
+H/1049	BUZO CANGURO CON FRISA LISO	XXL		17000	40000
+H/1050	BUZO CANGURO CON FRISA LISO	XXXL		17000	40000
+H/1051	BUZO CANGURO RUSTICO DE ALGODON LISO	S		11000	25000
+H/1052	BUZO CANGURO RUSTICO DE ALGODON LISO	M		11000	25000
+H/1053	BUZO CANGURO RUSTICO DE ALGODON LISO	L		11000	25000
+H/1054	BUZO CANGURO RUSTICO DE ALGODON LISO	XL		11000	25000
+H/1055	BUZO CANGURO RUSTICO DE ALGODON LISO	XXL		11000	25000
+H/1056	BUZO CANGURO RUSTICO DE ALGODON LISO	XXXL		11000	25000
+H/1057	BUZO MICROPOLAR HOMBRE	S			
+H/1058	BUZO MICROPOLAR HOMBRE	M			
+H/1059	BUZO MICROPOLAR HOMBRE	L			
+H/1060	BUZO MICROPOLAR HOMBRE	XL			
+H/1061	BUZO MICROPOLAR HOMBRE	XXL			
+H/1062	BUZO POLAR HOMBRE	S			
+H/1063	BUZO POLAR HOMBRE	M			
+H/1064	BUZO POLAR HOMBRE	L			
+H/1065	BUZO POLAR HOMBRE	XL			
+H/1066	BUZO POLAR HOMBRE	XXL			
+H/1067	BUZO POLAR HOMBRE	XXXL			
+H/1068	CAMISAS MANGAS CORTAS / LINO	1		8000	20000
+H/1069	CAMISAS MANGAS CORTAS / LINO	2		8000	20000
+H/1070	CAMISAS MANGAS CORTAS / LINO	3		8000	20000
+H/1071	CAMISAS MANGAS CORTAS / LINO	4		8000	20000
+H/1072	CAMISAS MANGAS CORTAS / LINO	5		8000	20000
+H/1073	CAMISAS MANGAS CORTAS / LINO	6		8000	20000
+H/1074	CAMISAS MANGAS LARGAS	38		11000	20000
+H/1075	CAMISAS MANGAS LARGAS	40		11000	20000
+H/1076	CAMISAS MANGAS LARGAS	42		11000	20000
+H/1077	CAMISAS MANGAS LARGAS	44		11000	20000
+H/1078	CAMISAS MANGAS LARGAS	46		11000	20000
+H/1079	CAMPERA CON FRISA ESTAMPADA 	S			
+H/1080	CAMPERA CON FRISA ESTAMPADA 	M			
+H/1081	CAMPERA CON FRISA ESTAMPADA 	L			
+H/1082	CAMPERA CON FRISA ESTAMPADA 	XL			
+H/1083	CAMPERA CON FRISA ESTAMPADA 	XXL			
+H/1084	CAMPERA CON FRISA ESTAMPADA 	XXXL			
+H/1085	CAMPERA CON FRISA LISA	S		18000	40000
+H/1086	CAMPERA CON FRISA LISA	M		18000	40000
+H/1087	CAMPERA CON FRISA LISA	L		18000	40000
+H/1088	CAMPERA CON FRISA LISA	XL		18000	40000
+H/1089	CAMPERA CON FRISA LISA	XXL		18000	40000
+H/1090	CAMPERA CON FRISA LISA	XXXL		18000	40000
+H/1091	CAMPERA INFLABLE HOMBRE	S			
+H/1092	CAMPERA INFLABLE HOMBRE	M			
+H/1093	CAMPERA INFLABLE HOMBRE	L			
+H/1094	CAMPERA INFLABLE HOMBRE	XL			
+H/1095	CAMPERA INFLABLE HOMBRE	XXL			
+H/1096	CAMPERA INFLABLE HOMBRE	XXXL			
+H/1097	CAMPERA POLAR HOMBRE	S			
+H/1098	CAMPERA POLAR HOMBRE	M			
+H/1099	CAMPERA POLAR HOMBRE	L			
+H/1100	CAMPERA POLAR HOMBRE	XL			
+H/1101	CAMPERA POLAR HOMBRE	XXL			
+H/1102	CAMPERA POLAR HOMBRE	XXXL			
+H/1103	CAMPERA RUSTICA DE ALGODON LISA	S		18000	40000
+H/1104	CAMPERA RUSTICA DE ALGODON LISA	M		18000	40000
+H/1105	CAMPERA RUSTICA DE ALGODON LISA	L		18000	40000
+H/1106	CAMPERA RUSTICA DE ALGODON LISA	XL		18000	40000
+H/1107	CAMPERA RUSTICA DE ALGODON LISA	XXL		18000	40000
+H/1108	CAMPERA RUSTICA DE ALGODON LISA	XXXL		18000	40000
+H/1109	CAMPERAS HILO HOMBRE	S			
+H/1110	CAMPERAS HILO HOMBRE	M			
+H/1111	CAMPERAS HILO HOMBRE	L			
+H/1112	CAMPERAS HILO HOMBRE	XL			
+H/1113	CAMPERAS HILO HOMBRE	XXL			
+H/1114	CAMPERAS HILO HOMBRE	XXXL			
+H/1115	CHALECO INFLABLE HOMBRE	S			
+H/1116	CHALECO INFLABLE HOMBRE	M			
+H/1117	CHALECO INFLABLE HOMBRE	L			
+H/1118	CHALECO INFLABLE HOMBRE	XL			
+H/1119	CHALECO INFLABLE HOMBRE	XXL			
+H/1120	CHALECO INFLABLE HOMBRE	XXXL			
+H/1121	CHALECO POLAR HOMBRE	S			
+H/1122	CHALECO POLAR HOMBRE	M			
+H/1123	CHALECO POLAR HOMBRE	L			
+H/1124	CHALECO POLAR HOMBRE	XL			
+H/1125	CHALECO POLAR HOMBRE	XXL			
+H/1126	CHALECO POLAR HOMBRE	XXXL			
+H/1127	CHOMBAS HOMBRE	S		8000	20000
+H/1128	CHOMBAS HOMBRE	M		8000	20000
+H/1129	CHOMBAS HOMBRE	L		8000	20000
+H/1130	CHOMBAS HOMBRE	XL		8000	20000
+H/1131	CHOMBAS HOMBRE	XXL		8000	20000
+H/1132	CHOMBAS HOMBRE	XXXL		8000	20000
+H/1133	CHOMBAS HOMBRE	7		8000	20000
+H/1134	CHOMBAS HOMBRE	8		8000	20000
+H/1135	CHOMBAS HOMBRE	9		8000	20000
+H/1136	CHOMBAS HOMBRE	10		8000	20000
+H/1137	CHUPIN DEPORTIVO CON FRISA	1			
+H/1138	CHUPIN DEPORTIVO CON FRISA	2			
+H/1139	CHUPIN DEPORTIVO CON FRISA	3			
+H/1140	CHUPIN DEPORTIVO CON FRISA	4			
+H/1141	CHUPIN DEPORTIVO CON FRISA	5			
+H/1142	CHUPIN DEPORTIVO CON FRISA	6			
+H/1143	CHUPIN DEPORTIVO SIN FRISA	1		7000	15000
+H/1144	CHUPIN DEPORTIVO SIN FRISA	2		7000	15000
+H/1145	CHUPIN DEPORTIVO SIN FRISA	3		7000	15000
+H/1146	CHUPIN DEPORTIVO SIN FRISA	4		7000	15000
+H/1147	CHUPIN DEPORTIVO SIN FRISA	5		7000	15000
+H/1148	CHUPIN DEPORTIVO SIN FRISA	6		7000	15000
+H/1149	JEANS CHUPIN HORMBRE	38		10000	30000
+H/1150	JEANS CHUPIN HORMBRE	40		10000	30000
+H/1151	JEANS CHUPIN HORMBRE	42		10000	30000
+H/1152	JEANS CHUPIN HORMBRE	44		10000	30000
+H/1153	JEANS CHUPIN HORMBRE	46		10000	30000
+H/1154	JEANS CHUPIN HORMBRE	48		10000	30000
+H/1155	JEANS CHUPIN HORMBRE	ESPECIALES		10000	30000
+H/1156	JEANS RECTO HOMBRE	38		14000	30000
+H/1157	JEANS RECTO HOMBRE	40		14000	30000
+H/1158	JEANS RECTO HOMBRE	42		14000	30000
+H/1159	JEANS RECTO HOMBRE	44		14000	30000
+H/1160	JEANS RECTO HOMBRE	46		14000	30000
+H/1161	JEANS RECTO HOMBRE	48		14000	30000
+H/1162	JEANS RECTO HOMBRE	ESPECIALES		14000	30000
+H/1163	JOGGING BABUCHA HOMBRE CON FRISA	1			
+H/1164	JOGGING BABUCHA HOMBRE CON FRISA	2			
+H/1165	JOGGING BABUCHA HOMBRE CON FRISA	3			
+H/1166	JOGGING BABUCHA HOMBRE CON FRISA	4			
+H/1167	JOGGING BABUCHA HOMBRE CON FRISA	5			
+H/1168	JOGGING BABUCHA HOMBRE CON FRISA	6			
+H/1169	JOGGING BABUCHA HOMBRE CON FRISA	ESPECIALES			
+H/1170	JOGGING BABUCHA MICROPOLAR	S			
+H/1171	JOGGING BABUCHA MICROPOLAR	M			
+H/1172	JOGGING BABUCHA MICROPOLAR	L			
+H/1173	JOGGING BABUCHA MICROPOLAR	XL			
+H/1174	JOGGING BABUCHA MICROPOLAR	XXL			
+H/1175	JOGGING BABUCHA MICROPOLAR	XXXL			
+H/1176	JOGGING CARGO HOMBRE CON FRISA	1			
+H/1177	JOGGING CARGO HOMBRE CON FRISA	2			
+H/1178	JOGGING CARGO HOMBRE CON FRISA	3			
+H/1179	JOGGING CARGO HOMBRE CON FRISA	4			
+H/1180	JOGGING CARGO HOMBRE CON FRISA	5			
+H/1181	JOGGING CARGO HOMBRE CON FRISA	6			
+H/1182	JOGGING RECTO HOMBRE CON FRISA	1			
+H/1183	JOGGING RECTO HOMBRE CON FRISA	2			
+H/1184	JOGGING RECTO HOMBRE CON FRISA	3			
+H/1185	JOGGING RECTO HOMBRE CON FRISA	4			
+H/1186	JOGGING RECTO HOMBRE CON FRISA	5			
+H/1187	JOGGING RECTO HOMBRE CON FRISA	6			
+H/1188	JOGGING RECTO HOMBRE CON FRISA	ESPECIALES			
+H/1189	MALLAS DE BAÑO HOMBRE	1		5000	15000
+H/1190	MALLAS DE BAÑO HOMBRE	2		5000	15000
+H/1191	MALLAS DE BAÑO HOMBRE	3		5000	15000
+H/1192	MALLAS DE BAÑO HOMBRE	4		5000	15000
+H/1193	MALLAS DE BAÑO HOMBRE	5		5000	15000
+H/1194	MALLAS DE BAÑO HOMBRE	6		5000	15000
+H/1195	MALLAS DE BAÑO HOMBRE	ESPECIALES		5000	15000
+H/1196	MEDIAS DE HOMBRE INVISIBLES	UNICO		1000	1500
+H/1197	MEDIAS DE HOMBRE LARGAS	UNICO		1000	1500
+H/1198	MEDIAS DE HOMBRE MEDIA CAÑA	UNICO		1000	1500
+H/1199	MEDIAS DE HOMBRE SOQUETE	UNICO		1000	1500
+H/1200	MUSCULOSA ACETATO HOMBRE	1		4000	10000
+H/1201	MUSCULOSA ACETATO HOMBRE	2		4000	10000
+H/1202	MUSCULOSA ACETATO HOMBRE	3		4000	10000
+H/1203	MUSCULOSA ACETATO HOMBRE	4		4000	10000
+H/1204	MUSCULOSA ACETATO HOMBRE	5		4000	10000
+H/1205	MUSCULOSA ACETATO HOMBRE	6		4000	10000
+H/1206	MUSCULOSA DE ALGODON HOMBRE	S		8000	18000
+H/1207	MUSCULOSA DE ALGODON HOMBRE	M		8000	18000
+H/1208	MUSCULOSA DE ALGODON HOMBRE	L		8000	18000
+H/1209	MUSCULOSA DE ALGODON HOMBRE	XL		8000	18000
+H/1210	MUSCULOSA DE ALGODON HOMBRE	XXL		8000	18000
+H/1211	MUSCULOSA DE ALGODON HOMBRE	XXXL		8000	18000
+H/1212	PANTALON CARGO BABUCHA HOMBRE	38		14000	30000
+H/1213	PANTALON CARGO BABUCHA HOMBRE	40		14000	30000
+H/1214	PANTALON CARGO BABUCHA HOMBRE	42		14000	30000
+H/1215	PANTALON CARGO BABUCHA HOMBRE	44		14000	30000
+H/1216	PANTALON CARGO BABUCHA HOMBRE	46		14000	30000
+H/1217	PANTALON CARGO BABUCHA HOMBRE	48		14000	30000
+H/1218	PANTALON CARGO BABUCHA HOMBRE	ESPECIALES		14000	30000
+H/1219	PANTALON CARGO RECTO HOMBRE	38		14000	30000
+H/1220	PANTALON CARGO RECTO HOMBRE	40		14000	30000
+H/1221	PANTALON CARGO RECTO HOMBRE	42		14000	30000
+H/1222	PANTALON CARGO RECTO HOMBRE	44		14000	30000
+H/1223	PANTALON CARGO RECTO HOMBRE	46		14000	30000
+H/1224	PANTALON CARGO RECTO HOMBRE	48		14000	30000
+H/1225	PANTALON CARGO RECTO HOMBRE	ESPECIALES		14000	30000
+H/1226	PANTALON CORTE CHINO HOMBRE	42		14000	30000
+H/1227	PANTALON CORTE CHINO HOMBRE	44		14000	30000
+H/1228	PANTALON CORTE CHINO HOMBRE	46		14000	30000
+H/1229	PANTALON CORTE CHINO HOMBRE 	38		14000	30000
+H/1230	PANTALON CORTE CHINO HOMBRE 	40		14000	30000
+H/1231	PANTALON CORTE CHINO HOMBRE 	48		14000	30000
+H/1232	PANTALON CORTE CHINO HOMBRE 	ESPECIALES		14000	30000
+H/1233	PANTALON GABARDINA RECTO HOMBRE	38		14000	30000
+H/1234	PANTALON GABARDINA RECTO HOMBRE	40		14000	30000
+H/1235	PANTALON GABARDINA RECTO HOMBRE	42		14000	30000
+H/1236	PANTALON GABARDINA RECTO HOMBRE	44		14000	30000
+H/1237	PANTALON GABARDINA RECTO HOMBRE	46		14000	30000
+H/1238	PANTALON GABARDINA RECTO HOMBRE	48		14000	30000
+H/1239	PILOTIN UNISEX	S		13000	25000
+H/1240	PILOTIN UNISEX	M		13000	25000
+H/1241	PILOTIN UNISEX	L		13000	25000
+H/1242	PILOTIN UNISEX	XL		13000	25000
+H/1243	PILOTIN UNISEX	XXL		13000	25000
+H/1244	PILOTIN UNISEX	XXXL		13000	25000
+H/1245	REMERAS DEPORTIVAS ACETATO HOMBRE	1		4000	10000
+H/1246	REMERAS DEPORTIVAS ACETATO HOMBRE	2		4000	10000
+H/1247	REMERAS DEPORTIVAS ACETATO HOMBRE	3		4000	10000
+H/1248	REMERAS DEPORTIVAS ACETATO HOMBRE	4		4000	10000
+H/1249	REMERAS DEPORTIVAS ACETATO HOMBRE	5		4000	10000
+H/1250	REMERAS DEPORTIVAS ACETATO HOMBRE	6		4000	10000
+H/1251	REMERAS SIN MANGAS HOMBRE	S		8000	18000
+H/1252	REMERAS SIN MANGAS HOMBRE	M		8000	18000
+H/1253	REMERAS SIN MANGAS HOMBRE	L		8000	18000
+H/1254	REMERAS SIN MANGAS HOMBRE	XL		8000	18000
+H/1255	REMERAS SIN MANGAS HOMBRE	XXL		8000	18000
+H/1256	REMERAS SIN MANGAS HOMBRE	XXXL		8000	18000
+H/1257	REMERAS URBANAS HOMBRE	S		7500	20000
+H/1258	REMERAS URBANAS HOMBRE	M		7500	20000
+H/1259	REMERAS URBANAS HOMBRE	L		7500	20000
+H/1260	REMERAS URBANAS HOMBRE	XL		7500	20000
+H/1261	REMERAS URBANAS HOMBRE	XXL		7500	20000
+H/1262	REMERAS URBANAS HOMBRE	XXXL		7500	20000
+H/1263	SHORT DEPORTIVO LYCRA	1		5000	15000
+H/1264	SHORT DEPORTIVO LYCRA	2		5000	15000
+H/1265	SHORT DEPORTIVO LYCRA	3		5000	15000
+H/1266	SHORT DEPORTIVO LYCRA	4		5000	15000
+H/1267	SHORT DEPORTIVO LYCRA	5		5000	15000
+H/1268	SHORT DEPORTIVO LYCRA	6		5000	15000
+H/1269	SHORT DEPORTIVO MICROFIBRA	1		6500	15000
+H/1270	SHORT DEPORTIVO MICROFIBRA	2		6500	15000
+H/1271	SHORT DEPORTIVO MICROFIBRA	3		6500	15000
+H/1272	SHORT DEPORTIVO MICROFIBRA	4		6500	15000
+H/1273	SHORT DEPORTIVO MICROFIBRA	5		6500	15000
+H/1274	SHORT DEPORTIVO MICROFIBRA	6		6500	15000
+H/1275	SHORT DEPORTIVO MICROFIBRA	ESPECIALES		6500	15000
+H/1276	SWEATER HOMBRE CUELLO REDONDO HILO	S			
+H/1277	SWEATER HOMBRE CUELLO REDONDO HILO	M			
+H/1278	SWEATER HOMBRE CUELLO REDONDO HILO	L			
+H/1279	SWEATER HOMBRE CUELLO REDONDO HILO	XL			
+H/1280	SWEATER HOMBRE CUELLO REDONDO HILO	XXL			
+H/1281	SWEATER HOMBRE CUELLO REDONDO HILO	XXXL			
+H/1282	SWEATER HOMBRE MEDIO CUELLO HILO	S			
+H/1283	SWEATER HOMBRE MEDIO CUELLO HILO	M			
+H/1284	SWEATER HOMBRE MEDIO CUELLO HILO	L			
+H/1285	SWEATER HOMBRE MEDIO CUELLO HILO	XL			
+H/1286	SWEATER HOMBRE MEDIO CUELLO HILO	XXL			
+H/1287	SWEATER HOMBRE MEDIO CUELLO HILO	XXXL			
+H/1288	SWEATER POLERA HOMBRE HILO	S			
+H/1289	SWEATER POLERA HOMBRE HILO	M			
+H/1290	SWEATER POLERA HOMBRE HILO	L			
+H/1291	SWEATER POLERA HOMBRE HILO	XL			
+H/1292	SWEATER POLERA HOMBRE HILO	XXL			
+H/1293	SWEATER POLERA HOMBRE HILO	XXXL			
+H/1294	TERMICAS REMERAS UNISEX	1			
+H/1295	TERMICAS REMERAS UNISEX	2			
+H/1296	TERMICAS REMERAS UNISEX	3			
+H/1297	TERMICAS REMERAS UNISEX	4			
+H/1298	TERMICAS REMERAS UNISEX	5			
+H/1299	TERMICAS REMERAS UNISEX	6			`;
+const jsonBase = generarJSONBaseDesdeTabla(texto);
+importarProductosBase(jsonBase);

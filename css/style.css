@@ -1747,22 +1747,7 @@ body {
     transition: .2s ease;
 }
 
-/* ================= MODO EMPLEADO ================= */
 
-.modo-empleado .privado {
-    display: none !important;
-}
-
-.modo-empleado .acciones {
-    display: none !important;
-}
-
-.modo-empleado .btn-editar,
-.modo-empleado .btn-eliminar,
-.modo-empleado .btn-talle {
-    pointer-events: none;
-    opacity: 0.4;
-}
 
 /* ===== LOGIN GATE ===== */
 .login-gate {
@@ -1920,4 +1905,408 @@ body {
     border-radius: 12px;
     border: 1px solid rgba(33, 37, 45, .10);
     background: rgba(17, 24, 39, .03);
+}
+
+/* =========================
+   TALLES – MÁS CHICOS Y FINOS
+   ========================= */
+
+.talles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* botón base */
+.btn-talle {
+    min-width: 38px;
+    /* más chico */
+    height: 28px;
+    /* más bajo */
+    padding: 0 8px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    border-radius: 999px;
+    font-size: 11px;
+    /* letra más chica */
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: .02em;
+
+    border: 1px solid rgba(0, 0, 0, .12);
+    background: rgba(255, 255, 255, .9);
+    color: rgba(0, 0, 0, .85);
+
+    cursor: pointer;
+    transition: all .12s ease;
+}
+
+/* textos largos (XXL, XXXL, ESPECIALES) */
+.btn-talle[data-largo="true"] {
+    min-width: 56px;
+    padding: 0 12px;
+}
+
+/* hover delicado */
+.btn-talle:hover {
+    background: #fff;
+    border-color: rgba(0, 0, 0, .18);
+}
+
+/* estados stock */
+.btn-talle.stock-ok {
+    background: rgba(20, 160, 90, .08);
+    border-color: rgba(20, 160, 90, .25);
+}
+
+.btn-talle.stock-low {
+    background: rgba(240, 160, 40, .10);
+    border-color: rgba(240, 160, 40, .35);
+}
+
+.btn-talle.stock-out {
+    background: rgba(220, 80, 80, .10);
+    border-color: rgba(220, 80, 80, .35);
+    opacity: .65;
+}
+
+#modalStock {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+}
+
+.oculto {
+    display: none !important;
+}
+
+.dash-toggle-btn {
+    border: 1px solid #e6e8ee;
+    background: #fff;
+    color: #21252d;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: .15s ease;
+}
+
+.dash-toggle-btn:hover {
+    background: #f6f7fb;
+}
+
+.dash-toggle-btn.oculto {
+    display: none !important;
+}
+
+/* ==========================
+   PRODUCTOS PRO: SOLO EMPLEADO
+   ========================== */
+
+/* Contenedor centrado y con ancho fijo */
+.modo-empleado #seccionProductos {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+/* Header y filas con el MISMO grid (5 columnas) */
+.modo-empleado .productos-header,
+.modo-empleado .producto-row {
+    display: grid;
+    grid-template-columns: 90px 2fr 1fr 1fr 2fr;
+    /* ID, Nombre, Precio, Categoria, Talles */
+    align-items: center;
+    gap: 12px;
+}
+
+/* Que todo quede centrado */
+.modo-empleado .productos-header>div,
+.modo-empleado .producto-row>div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Nombre alineado a la izquierda (se ve más pro) */
+.modo-empleado .productos-header>div:nth-child(2),
+.modo-empleado .producto-row>div:nth-child(2) {
+    justify-content: flex-start;
+}
+
+/* Fila tipo card, mismo alto visual */
+.modo-empleado .producto-row {
+    background: #fff;
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .06);
+    min-height: 58px;
+}
+
+/* Header más limpio */
+.modo-empleado .productos-header {
+    background: rgba(17, 24, 39, .06);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-weight: 800;
+    color: #111827;
+    margin-bottom: 10px;
+}
+
+/* Talles: chips prolijos y centrados */
+.modo-empleado .talles,
+.modo-empleado .talles-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+}
+
+/* Asegura que no “estire” raro */
+.modo-empleado .producto-row>div {
+    min-width: 0;
+}
+
+/* Si por error queda "acciones" o "privado" ocupando algo, lo mata */
+.modo-empleado .acciones,
+.modo-empleado .privado {
+    display: none !important;
+}
+
+/* =========================================
+   PRODUCTOS – MISMO LAYOUT QUE ADMIN
+   PERO SIN PRECIO COMPRA (EMPLEADO)
+   ========================================= */
+
+/* Ocultar precio compra (header + filas) */
+.modo-empleado .productos-header .precio-compra,
+.modo-empleado .producto-row .precio-compra {
+    display: none !important;
+}
+
+/* Reajustar grid quitando la columna de compra */
+.modo-empleado .productos-header,
+.modo-empleado .producto-row {
+    display: grid;
+    grid-template-columns:
+        90px
+        /* ID */
+        1.6fr
+        /* Nombre */
+        1fr
+        /* Precio venta */
+        1fr
+        /* Categoría */
+        2fr
+        /* Talles */
+        120px;
+    /* Acciones */
+    align-items: center;
+    column-gap: 12px;
+}
+
+/* Acciones siguen ocultas en empleado */
+.modo-empleado .acciones {
+    display: none !important;
+}
+
+/* =========================================
+   EMPLEADO: MISMO LOOK QUE ADMIN (COMPACTO)
+   SIN PRECIO COMPRA + SIN ACCIONES
+   ========================================= */
+
+/* ocultar columnas */
+.modo-empleado .precio-compra {
+    display: none !important;
+}
+
+.modo-empleado .acciones {
+    display: none !important;
+}
+
+/* mismo layout (todo “junto”), sin espacios raros */
+.modo-empleado .productos-header,
+.modo-empleado .producto-row {
+    display: grid;
+    grid-template-columns: 90px 1.2fr 130px 140px 1.6fr;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+}
+
+/* alineación como tabla normal */
+.modo-empleado .productos-header>div,
+.modo-empleado .producto-row>div {
+    text-align: center;
+}
+
+/* nombre a la izquierda (como admin) */
+.modo-empleado .productos-header>div:nth-child(2),
+.modo-empleado .producto-row>div:nth-child(2) {
+    text-align: left;
+}
+
+/* filas pegaditas (sin “tarjetas”) */
+.modo-empleado .producto-row {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+/* talles bien centrados y sin estirar */
+.modo-empleado .talles,
+.modo-empleado .talles-container {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* =====================================
+   EMPLEADO: HEADER PEGADO A LAS FILAS
+   ===================================== */
+
+/* Quitar efecto de pastilla del header */
+.modo-empleado .productos-header {
+    border-radius: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* Que la primera fila quede pegada */
+.modo-empleado .producto-row:first-child {
+    border-top: 1px solid #e5e7eb;
+}
+
+/* Filas continuas como tabla */
+.modo-empleado .producto-row {
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* ===========================
+   MODAL PRODUCTO – CLEAN PRO
+   PC 100% (bajo y ancho)
+   =========================== */
+
+#modalProducto {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+#modalProducto .modal-content {
+    background: #fa1717;
+    width: 100%;
+    max-width: 640px;
+    /* ⬅️ MÁS ANCHO */
+    padding: 14px 18px;
+    /* ⬅️ MENOS ALTO */
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+}
+
+/* ===== TÍTULO ===== */
+#modalProducto h2 {
+    font-size: 20px;
+    margin: 4px 0 10px;
+    text-align: center;
+}
+
+/* ===== INPUTS ===== */
+#modalProducto input,
+#modalProducto select {
+    width: 100%;
+    padding: 8px 12px;
+    /* ⬅️ BAJA ALTURA */
+    font-size: 13px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, .18);
+    outline: none;
+    background: #fff;
+}
+
+#modalProducto input:focus,
+#modalProducto select:focus {
+    border-color: #111;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, .12);
+}
+
+/* ===== LABELS ===== */
+#modalProducto label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 8px 0 4px;
+}
+
+/* ===== TEXTO AYUDA ===== */
+#modalProducto .small-muted {
+    font-size: 10px;
+    color: #666;
+    margin-top: 3px;
+    line-height: 1.2;
+}
+
+/* ===== TIPO TALLES ===== */
+#modalProducto select {
+    cursor: pointer;
+}
+
+/* ===== STOCK POR TALLE ===== */
+#modalProducto #stockInputs {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    /* ⬅️ MÁS COLUMNAS = MENOS ALTO */
+    gap: 6px;
+}
+
+#modalProducto #stockInputs input {
+    text-align: center;
+    padding: 6px 4px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 10px;
+    background: #fafafa;
+}
+
+/* ===== BOTONES ===== */
+#modalProducto .modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+#modalProducto .modal-actions button {
+    flex: 1;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 800;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+#modalProducto .btn-cancelar {
+    background: #fff;
+    border: 1px solid #ccc;
+}
+
+#modalProducto .btn-guardar {
+    background: #111;
+    color: #fff;
+    border: 1px solid #111;
+}
+
+#modalProducto .btn-guardar:hover {
+    filter: brightness(.9);
 }
