@@ -476,6 +476,12 @@
                                         </div>
 
                                         <div class="field">
+                                            <label class="form-label">Cuenta</label>
+                                            <select class="input" id="movCuenta">
+                                            </select>
+                                        </div>
+
+                                        <div class="field">
                                             <label class="form-label">Medio de pago</label>
                                             <select class="input" id="movMedioPago" required>
                                                 <option value="EFECTIVO">Efectivo</option>
@@ -499,9 +505,43 @@
 
                                         <button class="btn btn-dark" type="submit">Registrar movimiento</button>
                                     </form>
+
                                 </div>
                             </div>
+                        </div>
 
+                        <div class="col-right">
+                            <div class="card soft-card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Últimos movimientos (máx 50)</h5>
+                                    <div class="small-muted mb-10">Incluye ventas automáticas + ingresos/egresos
+                                        manuales.</div>
+
+                                    <div class="table-wrap">
+                                        <table class="table-soft">
+                                            <thead>
+                                                <tr>
+                                                    <th>Fecha</th>
+                                                    <th>Tipo</th>
+                                                    <th>Cuenta</th>
+                                                    <th>Desc</th>
+                                                    <th class="text-end">Monto</th>
+                                                    <th>Pago</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="tablaMovimientosBody">
+                                                <tr>
+                                                    <td colspan="6" class="text-center small-muted"
+                                                        style="padding:18px;">
+                                                        Sin movimientos todavía.
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                            </div>
                             <div class="card soft-card mt-16">
                                 <div class="card-body">
                                     <h5 class="card-title">Cerrar caja</h5>
@@ -519,40 +559,6 @@
 
                                         <button class="btn btn-danger-outline" type="submit">Cerrar</button>
                                     </form>
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <div class="col-right">
-                            <div class="card soft-card">
-                                <div class="card-body">
-                                    <h5 class="card-title">Últimos movimientos (máx 50)</h5>
-                                    <div class="small-muted mb-10">Incluye ventas automáticas + ingresos/egresos
-                                        manuales.</div>
-
-                                    <div class="table-wrap">
-                                        <table class="table-soft">
-                                            <thead>
-                                                <tr>
-                                                    <th>Fecha</th>
-                                                    <th>Tipo</th>
-                                                    <th>Desc</th>
-                                                    <th class="text-end">Monto</th>
-                                                    <th>Pago</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="tablaMovimientosBody">
-                                                <tr>
-                                                    <td colspan="5" class="text-center small-muted"
-                                                        style="padding:18px;">
-                                                        Sin movimientos todavía.
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-
                                 </div>
                             </div>
                         </div>

@@ -1252,24 +1252,27 @@ document.getElementById("listaCategorias")?.addEventListener("click", (e) => {
   const li = e.target.closest("li");
   if (!li) return;
 
-  // ignoro el "volver"
-  const txt = li.textContent.trim();
-  if (!txt || txt.startsWith("←")) return;
-
-  // si todavía estás en Hombre/Mujer/Todos, no filtro acá
-  if (txt === "Hombre" || txt === "Mujer" || txt === "Todos") return;
-
-  // filtro por categoría elegida
+  const txt = li.textContent.trim();  if (!txt || txt.startsWith("←")) return;  if (txt === "Hombre" || txt === "Mujer" || txt === "Todos") return;
   const cat = txt.toLowerCase();
+
   const filtrados = (stock.productos || []).filter(p =>
     String(p.categoria || "").toLowerCase().trim() === cat
   );
 
-  renderProductosFiltrados(filtrados);
+  // ✅ 1) cierro la sección que estabas usando
+  ocultarTodasLasSecciones();
 
+  // ✅ 2) muestro SOLO productos
   seccionProductos.classList.remove("oculto");
   btnVerProductosText.textContent = "Ocultar productos";
+
+  // ✅ 3) renderizo SOLO el filtrado
+  renderProductosFiltrados(filtrados);
+
+  // ✅ 4) cierro el dropdown y limpio buscador
   listaCategorias.classList.add("oculto");
+  inputBuscar.value = "";
+  sugerenciasBuscar?.classList.add("oculto");
 });
 
 // Mostrar sección de productos y hacer scroll
@@ -1639,11 +1642,12 @@ function renderCaja(){
     movs.forEach(m=>{
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td class="small-muted">${m.fecha}</td>
-        <td>${badgeHTML(m.tipo)}</td>
-        <td>${m.descripcion || ""}</td>
-        <td class="text-end fw-600">$${moneyAR(m.monto)}</td>
-        <td class="small-muted">${m.medio_pago || "-"}</td>
+         <td class="small-muted">${m.fecha}</td>
+         <td>${badgeHTML(m.tipo)}</td>
+         <td class="small-muted">${m.cuenta || "-"}</td>
+         <td>${m.descripcion || ""}</td>
+         <td class="text-end fw-600">$${moneyAR(Math.trunc(m.monto))}</td>
+         <td class="small-muted">${m.medio_pago || "-"}</td>
       `;
       body.appendChild(tr);
     });
@@ -1683,6 +1687,7 @@ if (formAbrirCaja){
       caja_id: cajaId,
       fecha: nowStr(),
       tipo: "INGRESO",
+      cuenta: "AJUSTE DE CAJA",
       descripcion: "Apertura de caja",
       monto: montoInicial,
       medio_pago: "EFECTIVO",
@@ -1695,9 +1700,13 @@ if (formAbrirCaja){
 
 // Movimiento manual
 const formMovCaja = document.getElementById("formMovCaja");
+
 if (formMovCaja){
   formMovCaja.addEventListener("submit", (e)=>{
     e.preventDefault();
+    
+    const cuenta = (document.getElementById("movCuenta")?.value || "").trim();
+
     const state = loadCaja();
     if (!state.abierta || !state.caja) return alert("Primero abrí la caja.");
 
@@ -1727,12 +1736,13 @@ if (tipo === "INGRESO" && chkPagoCC?.checked) {
 
     state.movimientos.push({
       id: Date.now(),
-      caja_id: state.caja.id,
-      fecha: nowStr(),
-      tipo,
-      descripcion: desc,
-      monto: signed,
-      medio_pago: medio
+  caja_id: state.caja.id,
+  fecha: nowStr(),
+  tipo,
+  cuenta,
+  descripcion: desc,
+  monto: signed,
+  medio_pago: medio
     });
 
     // 👉 Si es un INGRESO y corresponde a Cuenta Corriente
@@ -4084,3 +4094,53 @@ H/1298	TERMICAS REMERAS UNISEX	5
 H/1299	TERMICAS REMERAS UNISEX	6			`;
 const jsonBase = generarJSONBaseDesdeTabla(texto);
 importarProductosBase(jsonBase);
+
+const CUENTAS_CAJA = {
+  INGRESO: [
+    "GIFT",
+    "RESCATE DE FONDOS",
+    "RESCATE PLAZO FIJO",
+    "APORTE DE CAPITAL",
+    "AJUSTE DE CAJA",
+    "INGRESOS VARIOS"
+  ],
+  EGRESO: [
+    "COMPRAS",
+    "VIATICOS",
+    "TRANSPORTE",
+    "ENCOMIENDA",
+    "MONOTRIBUTO",
+    "INGRESOS BRUTOS",
+    "DREI",
+    "EPE",
+    "FUNESCOOP",
+    "SEGUROS",
+    "COMISIONES BANCARIAS POR VENTAS",
+    "GTOS. ART LIMPIEZA",
+    "GTOS DE ARREGLOS",
+    "FERRETERIA",
+    "PACKAGING",
+    "GTOS VARIOS",
+    "INVERSIONES",
+    "RETIRO GANANCIAS",
+    "ALQUILER"
+  ]
+};
+
+const selTipo   = document.getElementById("movTipo");
+const selCuenta = document.getElementById("movCuenta");
+
+function cargarCuentas() {
+  const tipo = selTipo.value;
+  selCuenta.innerHTML = "";
+
+  CUENTAS_CAJA[tipo].forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    selCuenta.appendChild(opt);
+  });
+}
+
+selTipo.addEventListener("change", cargarCuentas);
+cargarCuentas(); // inicial
