@@ -340,6 +340,11 @@
                             <input id="inputAds" type="text" placeholder="Dni" autocomplete="off">
                         </div>
 
+                        <label style="display:flex;align-items:center;gap:8px;margin:6px 0 10px 0;">
+                            <input type="checkbox" id="chkEnviarRecibo">
+                            Enviar comprobante por email
+                        </label>
+
                         <div class="producto-buscador">
                             <div class="buscador-wrapper">
                                 <input type="text" id="inputBuscarVenta" placeholder="Buscar producto"
@@ -377,8 +382,16 @@
                                 Total: $<span id="totalVenta"> 0</span></p>
                         </div>
 
-                        <button id="btnConfirmarVenta" class="btn-primary">Registrar
-                            venta</button>
+                        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
+                            <button id="btnVerComprobante" class="btn-primary" type="button">
+                                Ver comprobante
+                            </button>
+
+                            <button id="btnConfirmarVenta" class="btn-primary" type="button">
+                                Registrar venta
+                            </button>
+                        </div>
+
                     </div>
             </section>
 
@@ -434,6 +447,7 @@
 
                                     <div class="small-muted">Caja ID: <b id="cajaIdTxt">-</b></div>
                                     <div class="small-muted">Abierta en: <b id="cajaAbiertaEnTxt">-</b></div>
+                                    <div class="small-muted">Abrió: <b id="cajaUsuarioAperturaTxt">-</b></div>
 
                                     <div class="row-between mt-12">
                                         <span class="small-muted">Saldo esperado</span>
@@ -548,6 +562,15 @@
 
                                     <form id="formCerrarCaja" class="form-stack">
                                         <div class="field">
+                                            <label class="form-label">Usuario (cierre)</label>
+                                            <select class="input" id="usuarioCierre" required>
+                                                <option value="">Elegir...</option>
+                                                <option value="Natalia">Natalia</option>
+                                                <option value="Débora">Débora</option>
+                                                <option value="Empleado">Empleado</option>
+                                            </select>
+                                        </div>
+                                        <div class="field">
                                             <label class="form-label">Monto contado al cierre</label>
                                             <input class="input" id="cierreContado" type="number" step="0.01" required>
                                         </div>
@@ -582,10 +605,20 @@
 
                                 <form id="formAbrirCaja" class="form-stack">
                                     <div class="field">
+                                        <label class="form-label">Usuario (apertura)</label>
+                                        <select class="input" id="usuarioApertura" required>
+                                            <option value="">Elegir...</option>
+                                            <option value="Natalia">Natalia</option>
+                                            <option value="Débora">Débora</option>
+                                            <option value="Empleado">Empleado</option>
+                                        </select>
+                                    </div>
+                                    <div class="field">
                                         <label class="form-label">Monto inicial</label>
                                         <input class="input" id="montoInicial" type="number" step="0.01" value="0">
                                     </div>
                                     <button class="btn btn-dark" type="submit">Abrir caja</button>
+
                                 </form>
 
                             </div>
@@ -1081,7 +1114,6 @@
                     </div>
                 </div>
             </section>
-
         </main>
     </div>
 

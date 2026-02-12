@@ -2,6 +2,10 @@ import express from "express";
 import cors from "cors";
 import { Resend } from "resend";
 import puppeteer from "puppeteer";
+import fs from "fs";
+import path from "path";
+
+
 
 const app = express();
 app.use(cors());
@@ -61,7 +65,7 @@ function buildReciboHTML(venta) {
           </div>
 
           <div style="text-align:right;">
-            <div style="font-weight:700;color:#6b7280;font-size:13px;">${venta?.id ?? "-"}</div>
+            <div style="font-weight:700;color:#6b7280;font-size:13px;">${venta?.id || ""}</div>
             <div style="color:#9ca3af;font-size:12px;margin-top:3px;">${fecha}</div>
           </div>
         </div>
@@ -143,15 +147,10 @@ app.post("/api/preview-recibo-pdf", async (req, res) => {
     const html = buildReciboHTML(venta);
 
     const browser = await puppeteer.launch({
-  headless: true,
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-gpu",
-    "--disable-dev-shm-usage"
-  ],
-  timeout: 30000
-});
+      headless: true,
+      args: ["--no-sandbox","--disable-setuid-sandbox","--disable-gpu","--disable-dev-shm-usage"],
+      timeout: 30000
+    });
 
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
@@ -166,23 +165,449 @@ app.post("/api/preview-recibo-pdf", async (req, res) => {
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="comprobante-${venta?.id || "venta"}.pdf"`);
-    res.setHeader("Content-Type", "application/pdf");
-res.setHeader("Content-Disposition", `inline; filename="comprobante-${venta?.id || "venta"}.pdf"`);
-res.setHeader("Content-Length", String(pdfBuffer.length));
-res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-res.setHeader("Pragma", "no-cache");
-res.setHeader("Expires", "0");
-return res.end(pdfBuffer);
+    res.setHeader("Content-Length", String(pdfBuffer.length));
+    res.setHeader("Cache-Control", "no-store");
 
-    return res.send(pdfBuffer);
-  }  catch (e) {
-  console.error("❌ PDF ERROR:", e);
-  return res
-    .status(500)
-    .type("text/plain")
-    .send("PDF ERROR: " + (e?.stack || e?.message || String(e)));
-}
+    return res.end(pdfBuffer);
+  } catch (e) {
+    console.error("❌ PDF ERROR:", e);
+    return res.status(500).type("text/plain").send("PDF ERROR: " + (e?.stack || e?.message || String(e)));
+  }
 });
 
+import XLSX from "xlsx-js-style";
+
+// carpeta donde se guardan los excels
+const BASE_REG_DIR = path.join(process.cwd(), "registros", "cajas");
+
+function ensureDir(p) {
+  fs.mkdirSync(p, { recursive: true });
+}
+
+function yyyymmFromISO(isoDate) {
+  const d = new Date(isoDate || Date.now());
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function arMoney(n) {
+  return Number(n || 0);
+}
+
+function cellFill(hex) {
+  // xlsx usa ARGB
+  return { patternType: "solid", fgColor: { rgb: hex.replace("#", "").toUpperCase() } };
+}
+
+function appendRowToXlsx(filePath, sheetName, header, rowObj) {
+  let wb, ws;
+
+  if (fs.existsSync(filePath)) {
+    wb = XLSX.readFile(filePath);
+    ws = wb.Sheets[sheetName] || XLSX.utils.aoa_to_sheet([header]);
+  } else {
+    wb = XLSX.utils.book_new();
+    ws = XLSX.utils.aoa_to_sheet([header]);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  }
+
+  const current = XLSX.utils.sheet_to_json(ws, { defval: "" });
+  current.push(rowObj);
+
+  ws = XLSX.utils.json_to_sheet(current, { header });
+  wb.Sheets[sheetName] = ws;
+
+  // ---- anchos (PRO)
+  // ---- anchos dinámicos según hoja
+if (sheetName === "Ventas") {
+  ws["!cols"] = [
+    { wch: 20 }, // Fecha
+    { wch: 14 }, // ID
+    { wch: 16 }, // Vendedor
+    { wch: 22 }, // Cliente
+    { wch: 15 }, // Teléfono
+    { wch: 26 }, // Email (más ancho)
+    { wch: 14 }, // DNI
+    { wch: 16 }, // FormaPago
+    { wch: 20 }, // Banco (más chico)
+    { wch: 8 },  // Cuotas
+    { wch: 10 }, // Descuento
+    { wch: 14 }, // Subtotal
+    { wch: 14 }, // Total
+    { wch: 14 }  // Productos
+  ];
+} else {
+  // Caja (lo que ya tenías)
+  ws["!cols"] = [
+    { wch: 20 }, // Fecha
+    { wch: 14 }, // Turno
+    { wch: 12 }, // Usuario
+    { wch: 14 }, // Apertura
+    { wch: 14 }, // Cierre
+    { wch: 14 }, // Esperado
+    { wch: 14 }, // Diferencia
+    { wch: 12 }, // Estado
+    { wch: 32 }, // Observación
+  ];
+}
+
+  // ====== helpers estilo ======
+  const BORDER = {
+    top:    { style: "thin", color: { rgb: "E5E7EB" } },
+    bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+    left:   { style: "thin", color: { rgb: "E5E7EB" } },
+    right:  { style: "thin", color: { rgb: "E5E7EB" } }
+  };
+
+  function styleCell(addr, style){
+    if (!ws[addr]) return;
+    ws[addr].s = { ...(ws[addr].s || {}), ...style };
+  }
+
+  // ---- header dark (fila 1)
+  const headerFill = { patternType: "solid", fgColor: { rgb: "111827" } };
+  const headerFont = { bold: true, color: { rgb: "FFFFFF" } };
+
+  for (let c = 0; c < header.length; c++){
+    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    styleCell(addr, {
+      fill: headerFill,
+      font: headerFont,
+      border: BORDER,
+      alignment: { vertical: "center", horizontal: "center" }
+    });
+  }
+
+  // ---- zebra rows + bordes + alineación
+  const totalRows = current.length + 1; // + header
+  const zebra = { patternType: "solid", fgColor: { rgb: "F9FAFB" } }; // gris suave
+
+  for (let r = 1; r < totalRows; r++){
+    const isZebra = (r % 2 === 0); // intercalado
+    for (let c = 0; c < header.length; c++){
+      const addr = XLSX.utils.encode_cell({ r, c });
+
+      // base
+      styleCell(addr, {
+        border: BORDER,
+        alignment: { vertical: "center", horizontal: (c === 0 || c === 8) ? "left" : "center" } // fecha/obs left
+      });
+
+      // zebra
+      if (isZebra){
+        styleCell(addr, { fill: zebra });
+      }
+    }
+  }
+
+  // ---- formato moneda (Apertura..Diferencia) = columnas D,E,F,G (0-based: 3,4,5,6)
+  const moneyCols = [3,4,5,6];
+  for (let r = 1; r < totalRows; r++){
+    moneyCols.forEach(c=>{
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) return;
+      ws[addr].z = '#,##0;[Red]-#,##0';
+      styleCell(addr, { alignment: { horizontal: "right", vertical: "center" } });
+    });
+  }
+
+  // ---- color diferencia + estado SOLO en última fila (la recién agregada)
+  const lastRowIndex = current.length + 1; // fila real en Excel (header=1)
+  const difCell = `G${lastRowIndex}`; // Diferencia (col 7 -> G)
+  const estCell = `H${lastRowIndex}`; // Estado (col 8 -> H)
+
+  const dif = Number(rowObj.Diferencia || 0);
+  const ok = dif >= 0;
+
+  const green = { patternType: "solid", fgColor: { rgb: "DCFCE7" } };
+  const red   = { patternType: "solid", fgColor: { rgb: "FEE2E2" } };
+
+  styleCell(difCell, { fill: ok ? green : red, font: { bold: true } });
+  styleCell(estCell, { fill: ok ? green : red, font: { bold: true } });
+
+  // ---- freeze header + filtro
+  ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+  ws["!autofilter"] = { ref: `A1:I${totalRows}` };
+
+  XLSX.writeFile(wb, filePath);
+}
+
+function monthDirFromISO(isoDate){
+  const d = new Date(isoDate || Date.now());
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return path.join(BASE_REG_DIR, `${y}-${m}`); // ej: registros/cajas/2026-02
+}
+
+app.post("/api/registrar-cierre-caja", (req, res) => {
+  try {
+    const payload = req.body || {};
+
+    const fecha = payload.fecha || new Date().toISOString();
+    const cajaId = String(payload.caja_id || "");
+    const apertura = arMoney(payload.apertura);
+    const cierre = arMoney(payload.cierre);
+    const esperado = arMoney(payload.esperado);
+    const diferencia = arMoney(payload.diferencia);
+
+    const estado = diferencia < 0 ? "NEGATIVO" : "OK";
+
+    const monthDir = monthDirFromISO(fecha);
+    ensureDir(monthDir);
+
+    const ym = yyyymmFromISO(fecha);
+    const mensualPath = path.join(monthDir, `cajas-${ym}.xlsx`);
+
+    const header = ["Fecha", "Turno", "Usuario", "Apertura", "Cierre", "Esperado", "Diferencia", "Estado", "Observación"];
+
+    const row = {
+      Fecha: new Date(fecha).toLocaleString("es-AR"),
+      Turno: cajaId,
+      Usuario: String(payload.usuario || "—"),
+      Apertura: apertura,
+      Cierre: cierre,
+      Esperado: esperado,
+      Diferencia: diferencia,
+      Estado: estado,
+      "Observación": String(payload.observacion || "")
+    };
+
+    appendRowToXlsx(mensualPath, "Cierres", header, row);
+
+    return res.json({ ok: true, file: `cajas-${ym}.xlsx` });
+
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: "No se pudo registrar el cierre en Excel" });
+  }
+});
+
+// ✅ token (ponelo por variable de entorno)
+const EXCEL_TOKEN = process.env.EXCEL_TOKEN || "cambia-esto-ya";
+
+function yyyymmNow(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+// ✅ Descarga Excel del mes (con token)
+app.get("/api/excel/cajas-mes", (req, res) => {
+  const token = String(req.query.token || "");
+  if (token !== EXCEL_TOKEN) return res.status(401).send("No autorizado");
+
+  const ym = yyyymmNow();
+  const filePath = path.join(BASE_REG_DIR, ym, `cajas-${ym}.xlsx`);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ ok:false, error:"Todavía no hay Excel del mes (cerrá una caja primero)." });
+  }
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `inline; filename="cajas-${ym}.xlsx"`);
+  return res.sendFile(filePath);
+});
+
+// =========================
+//  REGISTRO DE VENTAS (Excel + JSON + Preview)
+// =========================
+
+const BASE_VENTAS_DIR = path.join(process.cwd(), "registros", "ventas");
+
+function monthDirFromISO2(baseDir, isoDate){
+  const ym = yyyymmFromISO(isoDate);
+  return path.join(baseDir, ym);
+}
+
+function safeStr(x){ return String(x ?? "").trim(); }
+function num(x){ return Number(x || 0); }
+
+function resumenItems(productos = []) {
+  return (productos || [])
+    .map(p => String(p.id || "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function appendVentaToJson(jsonPath, venta){
+  let arr = [];
+  try { arr = JSON.parse(fs.readFileSync(jsonPath, "utf8") || "[]"); } catch {}
+  arr.push(venta);
+  fs.writeFileSync(jsonPath, JSON.stringify(arr, null, 2), "utf8");
+}
+
+function findVentaInJson(jsonPath, id){
+  try {
+    const arr = JSON.parse(fs.readFileSync(jsonPath, "utf8") || "[]");
+    return arr.find(v => String(v.id) === String(id)) || null;
+  } catch { return null; }
+}
+
+// ✅ Registrar venta: guarda en Excel mensual + JSON mensual
+app.post("/api/registrar-venta", (req, res) => {
+  try {
+    const venta = req.body?.venta || req.body || {};
+
+    const fechaISO = venta.fecha || new Date().toISOString();
+    const ym = yyyymmFromISO(fechaISO);
+    const monthDir = monthDirFromISO2(BASE_VENTAS_DIR, fechaISO);
+    ensureDir(monthDir);
+
+    const xlsxPath = path.join(monthDir, `ventas-${ym}.xlsx`);
+    const jsonPath = path.join(monthDir, `ventas-${ym}.json`);
+
+    // si no mandan id, generamos uno simple
+    // Genera número correlativo de 8 dígitos
+const contadorPath = path.join(BASE_VENTAS_DIR, "contador.json");
+
+let ultimo = 0;
+try {
+  ultimo = JSON.parse(fs.readFileSync(contadorPath, "utf8"))?.ultimo || 0;
+} catch {}
+
+const nuevoNumero = ultimo + 1;
+fs.writeFileSync(contadorPath, JSON.stringify({ ultimo: nuevoNumero }));
+
+const ventaId = "V-" + String(nuevoNumero).padStart(8, "0");
+
+
+    // guardo venta completa en JSON para poder “rearmar” comprobante luego
+    const ventaFull = {
+      ...venta,
+      id: ventaId,
+      fecha: fechaISO
+    };
+    appendVentaToJson(jsonPath, ventaFull);
+
+    // Excel: columnas
+    const header = [
+      "Fecha", "ID", "Vendedor", "Cliente", "Teléfono", "Email", "DNI",
+      "FormaPago", "Banco", "Cuotas", "Descuento",
+      "Subtotal", "Total", "Productos"
+    ];
+
+    const row = {
+      Fecha: new Date(fechaISO).toLocaleString("es-AR"),
+      ID: ventaId,
+      Vendedor: safeStr(venta.vendedor || "—"),
+      Cliente: safeStr(venta.cliente || "—"),
+      "Teléfono": safeStr(venta.telefono || ""),
+      Email: safeStr(venta.email || ""),
+      DNI: safeStr(venta.ads || venta.dni || ""), // vos usás "ads" en el recibo
+      FormaPago: safeStr(venta.formaPago || ""),
+      Banco: safeStr(venta.banco || ""),
+      Cuotas: safeStr(venta.cuotas || ""),
+      Descuento: num(venta.descuento || 0),
+      Subtotal: num(venta.subtotal || 0),
+      Total: num(venta.total || 0),
+      Productos: resumenItems(venta.productos || [])
+    };
+
+    appendRowToXlsx(xlsxPath, "Ventas", header, row);
+
+    return res.json({ ok: true, id: ventaId, ym, file: `ventas-${ym}.xlsx` });
+  } catch (e) {
+    console.error("❌ registrar-venta ERROR:", e);
+    return res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
+});
+
+// ✅ Buscar venta por ID (para soporte rápido)
+app.get("/api/ventas/:id", (req, res) => {
+  try {
+    const id = String(req.params.id || "");
+    const ym = req.query.ym ? String(req.query.ym) : yyyymmFromISO(new Date().toISOString());
+
+    const jsonPath = path.join(BASE_VENTAS_DIR, ym, `ventas-${ym}.json`);
+    const v = findVentaInJson(jsonPath, id);
+
+    if (!v) return res.status(404).json({ ok:false, error:"No encontrada" });
+    return res.json({ ok:true, venta: v });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok:false, error:"Error buscando venta" });
+  }
+});
+
+// ✅ Preview HTML desde ID (regenera usando tu buildReciboHTML)
+app.get("/api/ventas/:id/preview", (req, res) => {
+  try {
+    const id = String(req.params.id || "");
+    const ym = req.query.ym ? String(req.query.ym) : yyyymmFromISO(new Date().toISOString());
+
+    const jsonPath = path.join(BASE_VENTAS_DIR, ym, `ventas-${ym}.json`);
+    const v = findVentaInJson(jsonPath, id);
+
+    if (!v) return res.status(404).json({ ok:false, error:"No encontrada" });
+
+    const html = buildReciboHTML(v);
+    return res.json({ ok:true, html, id, ym });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok:false, error:"Error generando preview" });
+  }
+});
+
+const FROM_EMAIL = process.env.FROM_EMAIL || "Comprobantes <onboarding@resend.dev>"; // cambiá esto a tu remitente real
+
+app.post("/api/enviar-recibo-pdf", async (req, res) => {
+  try {
+    if (!resend) {
+      return res.status(400).json({ ok: false, error: "Resend no está configurado (falta RESEND_API_KEY)." });
+    }
+
+    const venta = req.body?.payload ? JSON.parse(req.body.payload) : (req.body || {});
+    const to = String(venta?.email || "").trim();
+    if (!to) return res.status(400).json({ ok: false, error: "Falta email del cliente." });
+
+    // 1) Generar PDF
+    const html = buildReciboHTML(venta);
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox","--disable-setuid-sandbox","--disable-gpu","--disable-dev-shm-usage"],
+      timeout: 30000
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "12mm", right: "12mm", bottom: "12mm", left: "12mm" }
+    });
+
+    await browser.close();
+
+    // 2) Enviar por email (PDF adjunto)
+    const filename = `comprobante-${venta?.id || "venta"}.pdf`;
+
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [to],
+      subject: `Tu comprobante ${venta?.id ? `(${venta.id})` : ""}`,
+      html: `
+        <p>Hola ${venta?.cliente || ""},</p>
+        <p>Adjuntamos tu comprobante de compra.</p>
+        <p>Gracias por tu compra.</p>
+      `,
+      attachments: [
+        {
+          filename,
+          content: pdfBuffer.toString("base64"),
+          type: "application/pdf"
+        }
+      ]
+    });
+
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("Enviar-recibo-pdf ERROR:", e);
+    return res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
+});
 
 app.listen(3000, () => console.log("API lista en http://127.0.0.1:3000"));

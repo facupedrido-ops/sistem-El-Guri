@@ -733,6 +733,33 @@ const telefono = document.getElementById("inputTelefono").value.trim();
 const ads = document.getElementById("inputAds").value.trim();
 const btnProveedores = document.getElementById("btnProveedores");
 const seccionProveedores = document.getElementById("seccionProveedores");
+const btnVerComprobante = document.getElementById("btnVerComprobante");
+
+btnVerComprobante?.addEventListener("click", async () => {
+  try {
+    const id = localStorage.getItem("ultima_venta_id");
+    const ym = localStorage.getItem("ultima_venta_ym") || ""; // opcional
+
+    if (!id) {
+      return alert("Todavía no hay una venta registrada. Registrá una venta y después tocá 'Ver comprobante'.");
+    }
+
+    // Pide al backend el HTML real de ESA venta (guardada en JSON)
+    const url = `${API_BASE}/api/ventas/${encodeURIComponent(id)}/preview` + (ym ? `?ym=${encodeURIComponent(ym)}` : "");
+    const r = await fetch(url);
+    const j = await r.json();
+
+    if (!r.ok || j.ok === false) {
+      return alert("No se pudo abrir el comprobante: " + (j.error || "Error"));
+    }
+
+    // Abre el comprobante real (ya con V-000000xx)
+    abrirPreviewComprobante(j.html);
+
+  } catch (e) {
+    alert("No se pudo abrir el comprobante: " + (e.message || e));
+  }
+});
 
 let carrito = [];
 let ventas = JSON.parse(localStorage.getItem("ventas_v1") || "[]");
@@ -947,7 +974,7 @@ selectPago.addEventListener("change", () => {
 });
 
 // Confirmar venta
-btnConfirmarVenta.addEventListener("click", () => {
+btnConfirmarVenta.addEventListener("click", async () => {
     const nombre = inputCliente.value.trim();
     const email = document.getElementById("inputEmail").value.trim();
     const telefono = document.getElementById("inputTelefono").value.trim();
@@ -970,31 +997,68 @@ btnConfirmarVenta.addEventListener("click", () => {
 
     if (carrito.length === 0) return alert("Debe agregar productos al carrito");
 
+    const stateVentaCaja = (typeof loadCaja === "function") ? loadCaja() : null;
+const vendedorActivo = stateVentaCaja?.caja?.usuario_apertura || "Empleado";
+
     // → Aquí sigue tu lógica de registrar venta
-    const venta = {
-        id: ventas.length + 1,
-        cliente: nombre,
-        email,
-        telefono,
-        ads,
-        productos: carrito.map(item => ({
-            id: item.producto.id,
-            nombre: item.producto.nombre,
-            talle: item.talle,
-            precio: item.producto.precio,
-            cantidad: item.cantidad
-        })),
-        pagoMixto: window.__ventaPagoMixto || null,
-        subtotal: parseMoneyAR(subtotalSpan.innerText),
-        total: parseMoneyAR(totalVentaSpan.innerText),
-        formaPago: selectPago.value,
-        banco: document.getElementById("selectBanco")?.value || null,
-        cuotas: selectPago.value === "tarjeta-credito" ? Number(inputCuotas.value) || 1 : 1,
-        descuento: Number(inputDescuento.value) || 0,
-        fecha: new Date()
-    };
-    
-    if (selectPago.value === "cuenta-corriente") {
+    // → Aquí sigue tu lógica de registrar venta
+const venta = {
+  cliente: nombre,
+  email,
+  telefono,
+  ads,
+  vendedor: (typeof loadCaja === "function" ? loadCaja()?.caja?.usuario_apertura : null) || "Empleado",
+  productos: carrito.map(item => ({
+    id: item.producto.id,
+    nombre: item.producto.nombre,
+    talle: item.talle,
+    precio: item.producto.precio,
+    cantidad: item.cantidad
+  })),
+  pagoMixto: window.__ventaPagoMixto || null,
+  subtotal: parseMoneyAR(subtotalSpan.innerText),
+  total: parseMoneyAR(totalVentaSpan.innerText),
+  formaPago: selectPago.value,
+  banco: document.getElementById("selectBanco")?.value || null,
+  cuotas: selectPago.value === "tarjeta-credito" ? Number(inputCuotas.value) || 1 : 1,
+  descuento: Number(inputDescuento.value) || 0,
+  fecha: new Date().toISOString()
+};
+
+ventas.push(venta);
+localStorage.setItem("ventas_v1", JSON.stringify(ventas));
+
+// ✅ 1) Registrar venta en backend para obtener ID real (V-00000001)
+let idReal = null;
+try {
+  const resp = await fetch(`${API_BASE}/api/registrar-venta`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ venta })
+  });
+
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || data.ok === false) {
+    alert("No se pudo registrar la venta en Excel: " + (data.error || "Error"));
+    return;
+  }
+
+  // ✅ ID real
+  idReal = data.id;
+venta.id = idReal;
+
+  localStorage.setItem("ultima_venta_id", data.id);
+localStorage.setItem("ultima_venta_ym", data.ym || "");
+
+  // guardar ventas con el ID correcto
+  localStorage.setItem("ventas_v1", JSON.stringify(ventas));
+} catch (err) {
+  alert("Venta guardada en el sistema, pero NO se pudo guardar en Excel.");
+  return; // si querés, podés no cortar, pero así queda prolijo
+}
+
+// ✅ 2) Cuenta corriente (AHORA sí, ya con ID)
+if (selectPago.value === "cuenta-corriente") {
   const clienteId = cc_upsertCliente({
     nombre,
     tel: telefono,
@@ -1009,8 +1073,23 @@ btnConfirmarVenta.addEventListener("click", () => {
   );
 }
 
-    ventas.push(venta);
-    localStorage.setItem("ventas_v1", JSON.stringify(ventas));
+// ✅ 3) Enviar recibo SOLO si está tildado
+const chk = document.getElementById("chkEnviarRecibo");
+if (chk && chk.checked && venta.email) {
+  fetch(`${API_BASE}/api/enviar-recibo-pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(venta) // envío la venta completa con ID real
+  })
+  .then(r => r.json())
+  .then(j => {
+    if (!j.ok) throw new Error(j.error || "Error enviando");
+    alert(" Comprobante enviado por email");
+  })
+  .catch(err => {
+    alert("Venta registrada, pero no se pudo enviar el PDF.\n" + err.message);
+  });
+}
 
     if (selectPago.value !== "cuenta-corriente") {
       registrarVentaEnCaja(venta);
@@ -1618,6 +1697,8 @@ function renderCaja(){
 
     document.getElementById("cajaIdTxt").textContent = state.caja.id;
     document.getElementById("cajaAbiertaEnTxt").textContent = state.caja.abierta_en;
+    document.getElementById("cajaUsuarioAperturaTxt").textContent =
+  state.caja.usuario_apertura || "-";
 
     const saldo = calcSaldoEsperado(state);
     document.getElementById("saldoEsperadoTxt").textContent = moneyAR(saldo);
@@ -1678,7 +1759,15 @@ if (formAbrirCaja){
 
     const cajaId = Date.now(); // id simple
     state.abierta = true;
-    state.caja = { id: cajaId, abierta_en: nowStr(), monto_inicial: montoInicial };
+    const usuarioApertura = document.getElementById("usuarioApertura")?.value || "";
+if (!usuarioApertura) return alert("Elegí el usuario que abre la caja.");
+
+state.caja = {
+  id: cajaId,
+  abierta_en: nowStr(),
+  monto_inicial: montoInicial,
+  usuario_apertura: usuarioApertura
+};
     state.movimientos = state.movimientos || [];
 
     // movimiento apertura
@@ -1697,6 +1786,7 @@ if (formAbrirCaja){
     renderCaja();
   });
 }
+document.getElementById("usuarioApertura").value = "";
 
 // Movimiento manual
 const formMovCaja = document.getElementById("formMovCaja");
@@ -1764,9 +1854,10 @@ if (tipo === "INGRESO" && window.esPagoCuentaCorriente === true) {
 }
 
 // Cerrar caja
+// Cerrar caja
 const formCerrarCaja = document.getElementById("formCerrarCaja");
 if (formCerrarCaja){
-  formCerrarCaja.addEventListener("submit", (e)=>{
+  formCerrarCaja.addEventListener("submit", async (e)=>{
     e.preventDefault();
     if (!confirm("Cerrar caja?")) return;
 
@@ -1776,6 +1867,10 @@ if (formCerrarCaja){
     const contado = Number(document.getElementById("cierreContado").value || 0);
     const obs = document.getElementById("cierreObs").value.trim();
 
+    const usuarioCierre = document.getElementById("usuarioCierre")?.value || "";
+if (!usuarioCierre) return alert("Elegí el usuario que cierra la caja.");
+
+
     const saldo = calcSaldoEsperado(state);
     state.ultimaDiferencia = contado - saldo;
 
@@ -1783,12 +1878,41 @@ if (formCerrarCaja){
     state.caja.cerrada_en = nowStr();
     state.caja.monto_contado_cierre = contado;
     state.caja.observacion = obs;
+    state.caja.usuario_cierre = usuarioCierre;
+
+    // ✅ snapshot para mandar al backend (ANTES de limpiar state.caja)
+    const cierrePayload = {
+  fecha: new Date().toISOString(),
+  caja_id: state.caja.id,
+  apertura: Number(state.caja.monto_inicial || 0),
+  cierre: Number(contado || 0),
+  esperado: Number(saldo || 0),
+  diferencia: Number(state.ultimaDiferencia || 0),
+  usuario: usuarioCierre,   // 👈 ESTO ES CLAVE
+  observacion: obs || ""
+};
+
 
     // cerramos
     state.abierta = false;
     state.caja = null;
 
     saveCaja(state);
+
+document.getElementById("usuarioCierre").value = "";
+    // ✅ registrar en Excel (no rompe si falla, solo avisa)
+    try {
+      const r = await fetch(`${API_BASE}/api/registrar-cierre-caja`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cierrePayload)
+      });
+      const j = await r.json().catch(()=> ({}));
+      if (!r.ok || j.ok === false) throw new Error(j.error || "Error registrando cierre");
+      // opcional: alert("Cierre guardado en Excel ✅");
+    } catch (err) {
+      alert("Cerró la caja, pero NO se pudo guardar en Excel: " + err.message);
+    }
 
     // limpiar form
     document.getElementById("cierreContado").value = "";
@@ -4144,3 +4268,61 @@ function cargarCuentas() {
 
 selTipo.addEventListener("change", cargarCuentas);
 cargarCuentas(); // inicial
+
+// ✅ importante: ahora DEVUELVE el JSON del backend (para usar preview_html)
+async function apiEnviarRecibo(venta) {
+  const r = await fetch(`${API_BASE}/api/enviar-recibo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(venta)
+  });
+
+  const j = await r.json().catch(() => ({}));
+
+  if (!r.ok || j.ok === false) {
+    throw new Error(j.error || "Error enviando recibo");
+  }
+
+  return j; // <-- clave
+}
+
+function abrirPreviewComprobante(html) {
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("Tu navegador bloqueó la ventana emergente. Permití popups para ver el comprobante.");
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+async function apiPreviewRecibo(venta) {
+  const r = await fetch(`${API_BASE}/api/preview-recibo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(venta),
+  });
+
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || "No se pudo generar el comprobante");
+  return j.html;
+}
+
+function abrirPreviewPDF(venta) {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = `${API_BASE}/api/preview-recibo-pdf`;
+  form.target = "_blank";
+
+  const input = document.createElement("input");
+  input.type = "hidden";
+  input.name = "payload";
+  input.value = JSON.stringify(venta);
+
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+}
+
