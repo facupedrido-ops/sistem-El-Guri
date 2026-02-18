@@ -1,0 +1,252 @@
+[
+  {
+    "cliente": "Sdvfs",
+    "email": "",
+    "telefono": "",
+    "ads": "",
+    "vendedor": "Natalia",
+    "productos": [
+      {
+        "id": "H/1000",
+        "nombre": "Bermudas Algodon O Wafle",
+        "talle": "1",
+        "precio": 15000,
+        "cantidad": 1
+      }
+    ],
+    "pagoMixto": null,
+    "subtotal": 15000,
+    "total": 15000,
+    "formaPago": "efectivo",
+    "banco": null,
+    "cuotas": 1,
+    "descuento": 0,
+    "fecha": "2026-02-14T20:06:24.458Z",
+    "id": "V-00000003"
+  },
+  {
+    "cliente": "Vwerfwef",
+    "email": "",
+    "telefono": "",
+    "ads": "",
+    "vendedor": "Natalia",
+    "productos": [
+      {
+        "id": "H/1000",
+        "nombre": "Bermudas Algodon O Wafle",
+        "talle": "1",
+        "precio": 15000,
+        "cantidad": 1
+      }
+    ],
+    "pagoMixto": null,
+    "subtotal": 15000,
+    "total": 15000,
+    "formaPago": "efectivo",
+    "banco": null,
+    "cuotas": 1,
+    "descuento": 0,
+    "fecha": "2026-02-14T20:07:14.599Z",
+    "id": "V-00000004"
+  },
+  {
+    "cliente": "Dsfs",
+    "email": "facundo@gmail.com",
+    "telefono": "",
+    "ads": "",
+    "vendedor": "Empleado",
+    "productos": [
+      {
+        "id": "H/1000",
+        "nombre": "Bermudas Algodon O Wafle",
+        "talle": "1",
+        "precio": 15000,
+        "cantidad": 1
+      }
+    ],
+    "pagoMixto": null,
+    "subtotal": 15000,
+    "total": 15000,
+    "formaPago": "transferencia",
+    "banco": null,
+    "cuotas": 1,
+    "descuento": 0,
+    "fecha": "2026-02-17T17:01:54.682Z",
+    "id": "V-00000001"
+  },
+  {
+    "cliente": "Sdfdsfd",
+    "email": "facupedrido@gmail.com",
+    "telefono": "",
+    "ads": "",
+    "vendedor": "Empleado",
+    "productos": [
+      {
+        "id": "H/1000",
+        "nombre": "Bermudas Algodon O Wafle",
+        "talle": "1",
+        "precio": 15000,
+        "cantidad": 1
+      }
+    ],
+    "pagoMixto": null,
+    "subtotal": 15000,
+    "total": 15000,
+    "formaPago": "efectivo",
+    "banco": null,
+    "cuotas": 1,
+    "descuento": 0,
+    "fecha": "2026-02-17T17:02:28.974Z",
+    "id": "V-00000002"
+  },
+  {
+    "cliente": "Dsfsdfsd",
+    "email": "facupedrido@gmail.com",
+    "telefono": "",
+    "ads": "",
+    "vendedor": "Empleado",
+    "productos": [
+      {
+        "id": "H/1000",
+        "nombre": "Bermudas Algodon O Wafle",
+        "talle": "1",
+        "precio": 15000,
+        "cantidad": 1
+      }
+    ],
+    "pagoMixto": null,
+    "subtotal": 15000,
+    "total": 15000,
+    "formaPago": "efectivo",
+    "banco": null,
+    "cuotas": 1,
+    "descuento": 0,
+    "fecha": "2026-02-17T17:10:45.057Z",
+    "id": "V-00000003"
+  },
+  {
+    "cliente": "Efdwfw",
+    "email": "facupedrido@gmail.com",
+    "telefono": "",
+    "ads": "",
+    "vendedor": "Empleado",
+    "productos": [
+      {
+        "id": "H/1000",
+        "nombre": "Bermudas Algodon O Wafle",
+        "talle": "1",
+        "precio": 15000,
+        "cantidad": 1
+      }
+    ],
+    "pagoMixto": null,
+    "subtotal": 15000,
+    "total": 15000,
+    "formaPago": "efectivo",
+    "banco": null,
+    "cuotas": 1,
+    "descuento": 0,
+    "fecha": "2026-02-17T17:37:19.636Z",
+    "id": "V-00000004"
+  },
+  {
+    "cliente": "1fsdfsd",
+    "email": "facupedrido@gmail.com",
+    "telefono": "",
+    "ads": "",
+    "vendedor": "Empleado",
+    "productos": [
+      {
+        "id": "H/1000",
+        "nombre": "Bermudas Algodon O Wafle",
+        "talle": "3",
+        "precio": 15000,
+        "cantidad": 123123123123
+      }
+    ],
+    "pagoMixto": null,
+    "subtotal": 1846846846845000,
+    "total": 1846846846845000,
+    "formaPago": "efectivo",
+    "banco": null,
+    "cuotas": 1,
+    "descuento": 0,
+    "fecha": "2026-02-17T17:37:42.226Z",
+    "id": "V-00000005"
+  },
+  {
+    "cliente": "Vdfd",
+    "email": "facupedrido@gmail.com",
+    "telefono": "",
+    "ads": "",
+    "vendedor": "Empleado",
+    "productos": [
+      {
+        "id": "H/1000",
+        "nombre": "Bermudas Algodon O Wafle",
+        "talle": "1",
+        "precio": 15000,
+        "cantidad": 2
+      }
+    ],
+    "pagoMixto": null,
+    "subtotal": 30000,
+    "total": 30000,
+    "formaPago": "efectivo",
+    "banco": null,
+    "cuotas": 1,
+    "descuento": 0,
+    "fecha": "2026-02-17T17:41:29.007Z",
+    "id": "V-00000006"
+  },
+  {
+    "cliente": "Dsfsdf",
+    "email": "facupedrido@gmail.com",
+    "telefono": "",
+    "ads": "",
+    "vendedor": "Empleado",
+    "productos": [
+      {
+        "id": "H/1000",
+        "nombre": "Bermudas Algodon O Wafle",
+        "talle": "1",
+        "precio": 15000,
+        "cantidad": 1
+      }
+    ],
+    "pagoMixto": null,
+    "subtotal": 15000,
+    "total": 15000,
+    "formaPago": "efectivo",
+    "banco": null,
+    "cuotas": 1,
+    "descuento": 0,
+    "fecha": "2026-02-17T17:44:36.670Z",
+    "id": "V-00000007"
+  },
+  {
+    "cliente": "Wefwe",
+    "email": "facu@gmail.com",
+    "telefono": "",
+    "ads": "",
+    "vendedor": "Natalia",
+    "productos": [
+      {
+        "id": "H/1000",
+        "nombre": "Bermudas Algodon O Wafle",
+        "talle": "1",
+        "precio": 15000,
+        "cantidad": 1
+      }
+    ],
+    "pagoMixto": null,
+    "subtotal": 15000,
+    "total": 15000,
+    "formaPago": "cuenta-corriente",
+    "banco": null,
+    "cuotas": 1,
+    "descuento": 0,
+    "fecha": "2026-02-18T19:19:43.211Z",
+    "id": "V-00000008"
+  }
+]

@@ -2,10 +2,7 @@ import express from "express";
 import cors from "cors";
 import { Resend } from "resend";
 import puppeteer from "puppeteer";
-import fs from "fs";
-import path from "path";
-
-
+import fs from "fs";import path from "path";
 
 const app = express();
 app.use(cors());
@@ -20,7 +17,10 @@ function moneyAR(n) {
 }
 
 function buildReciboHTML(venta) {
-  const fecha = new Date(venta?.fecha || Date.now()).toLocaleString("es-AR");
+  const fecha = new Date(venta?.fecha || Date.now()).toLocaleString("es-AR", {
+  timeZone: "America/Argentina/Buenos_Aires",
+  hour12: false
+});
   const tel = venta?.telefono ? ` <b>• Tel: ${venta.telefono}</b>` : "";
   const dni = venta?.ads ? ` <b>• DNI: ${venta.ads}</b>` : "";
 
@@ -221,116 +221,164 @@ function appendRowToXlsx(filePath, sheetName, header, rowObj) {
   // ---- anchos (PRO)
   // ---- anchos dinámicos según hoja
 if (sheetName === "Ventas") {
+
   ws["!cols"] = [
-    { wch: 20 }, // Fecha
-    { wch: 14 }, // ID
-    { wch: 16 }, // Vendedor
-    { wch: 22 }, // Cliente
-    { wch: 15 }, // Teléfono
-    { wch: 26 }, // Email (más ancho)
-    { wch: 14 }, // DNI
-    { wch: 16 }, // FormaPago
-    { wch: 20 }, // Banco (más chico)
-    { wch: 8 },  // Cuotas
-    { wch: 10 }, // Descuento
-    { wch: 14 }, // Subtotal
-    { wch: 14 }, // Total
-    { wch: 14 }  // Productos
+    { wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 22 },
+    { wch: 15 }, { wch: 26 }, { wch: 14 }, { wch: 16 },
+    { wch: 20 }, { wch: 8 }, { wch: 10 },
+    { wch: 14 }, { wch: 14 }, { wch: 14 }
   ];
-} else {
-  // Caja (lo que ya tenías)
+
+} else if (sheetName === "Cierres") {
+
   ws["!cols"] = [
-    { wch: 20 }, // Fecha
-    { wch: 14 }, // Turno
-    { wch: 12 }, // Usuario
-    { wch: 14 }, // Apertura
-    { wch: 14 }, // Cierre
-    { wch: 14 }, // Esperado
-    { wch: 14 }, // Diferencia
-    { wch: 12 }, // Estado
-    { wch: 32 }, // Observación
+    { wch: 20 }, { wch: 14 }, { wch: 12 },
+    { wch: 14 }, { wch: 14 }, { wch: 14 },
+    { wch: 14 }, { wch: 12 }, { wch: 32 }
+  ];
+
+} else if (sheetName === "Cambios") {
+
+  ws["!cols"] = [
+    { wch: 20 }, { wch: 14 },
+    { wch: 22 }, { wch: 12 }, { wch: 10 },
+    { wch: 14 }, { wch: 14 },
+    { wch: 22 }, { wch: 12 }, { wch: 10 },
+    { wch: 14 }, { wch: 14 },
+    { wch: 12 }, { wch: 16 }, { wch: 24 }
+  ];
+
+} else if (sheetName === "GiftCards") {
+
+  ws["!cols"] = [
+    { wch: 20 }, { wch: 16 }, { wch: 22 },
+    { wch: 14 }, { wch: 14 }, { wch: 14 },
+    { wch: 14 }, { wch: 24 }
+  ];
+
+} else if (sheetName === "CuentaCorriente") {
+
+  ws["!cols"] = [
+    { wch: 20 }, { wch: 22 }, { wch: 14 },
+    { wch: 16 }, { wch: 22 }, { wch: 14 },
+    { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 24 }
   ];
 }
 
-  // ====== helpers estilo ======
-  const BORDER = {
-    top:    { style: "thin", color: { rgb: "E5E7EB" } },
-    bottom: { style: "thin", color: { rgb: "E5E7EB" } },
-    left:   { style: "thin", color: { rgb: "E5E7EB" } },
-    right:  { style: "thin", color: { rgb: "E5E7EB" } }
-  };
+// ====== helpers estilo ======
+const BORDER = {
+  top:    { style: "thin", color: { rgb: "E5E7EB" } },
+  bottom: { style: "thin", color: { rgb: "E5E7EB" } },
+  left:   { style: "thin", color: { rgb: "E5E7EB" } },
+  right:  { style: "thin", color: { rgb: "E5E7EB" } }
+};
 
-  function styleCell(addr, style){
-    if (!ws[addr]) return;
-    ws[addr].s = { ...(ws[addr].s || {}), ...style };
-  }
+function styleCell(addr, style){
+  if (!ws[addr]) return;
+  ws[addr].s = { ...(ws[addr].s || {}), ...style };
+}
 
-  // ---- header dark (fila 1)
-  const headerFill = { patternType: "solid", fgColor: { rgb: "111827" } };
-  const headerFont = { bold: true, color: { rgb: "FFFFFF" } };
+// ---- header dark (fila 1)
+const headerFill = { patternType: "solid", fgColor: { rgb: "111827" } };
+const headerFont = { bold: true, color: { rgb: "FFFFFF" } };
 
+// altura header
+ws["!rows"] = ws["!rows"] || [];
+ws["!rows"][0] = { hpt: 22 };
+
+// header styles
+for (let c = 0; c < header.length; c++){
+  const addr = XLSX.utils.encode_cell({ r: 0, c });
+  styleCell(addr, {
+    fill: headerFill,
+    font: headerFont,
+    border: BORDER,
+    alignment: { vertical: "center", horizontal: "center", wrapText: true }
+  });
+}
+
+// ---- zebra rows + bordes + alineación + wrap
+const totalRows = current.length + 1; // + header
+const zebra = { patternType: "solid", fgColor: { rgb: "F9FAFB" } };
+
+for (let r = 1; r < totalRows; r++){
+  const isZebra = (r % 2 === 0);
   for (let c = 0; c < header.length; c++){
-    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    const addr = XLSX.utils.encode_cell({ r, c });
+
+    // base
     styleCell(addr, {
-      fill: headerFill,
-      font: headerFont,
-      border: BORDER,
-      alignment: { vertical: "center", horizontal: "center" }
-    });
+  border: BORDER,
+  alignment: {
+    vertical: "center",
+    horizontal: "center",  // ✅ todo centrado
+    wrapText: true
   }
+});
 
-  // ---- zebra rows + bordes + alineación
-  const totalRows = current.length + 1; // + header
-  const zebra = { patternType: "solid", fgColor: { rgb: "F9FAFB" } }; // gris suave
-
-  for (let r = 1; r < totalRows; r++){
-    const isZebra = (r % 2 === 0); // intercalado
-    for (let c = 0; c < header.length; c++){
-      const addr = XLSX.utils.encode_cell({ r, c });
-
-      // base
-      styleCell(addr, {
-        border: BORDER,
-        alignment: { vertical: "center", horizontal: (c === 0 || c === 8) ? "left" : "center" } // fecha/obs left
-      });
-
-      // zebra
-      if (isZebra){
-        styleCell(addr, { fill: zebra });
-      }
-    }
+    // zebra
+    if (isZebra) styleCell(addr, { fill: zebra });
   }
+}
 
-  // ---- formato moneda (Apertura..Diferencia) = columnas D,E,F,G (0-based: 3,4,5,6)
-  const moneyCols = [3,4,5,6];
+// ---- Freeze header + autofilter dinámico (según cantidad de columnas)
+ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+const lastCol = XLSX.utils.encode_col(header.length - 1); // A,B,C...
+ws["!autofilter"] = { ref: `A1:${lastCol}${totalRows}` };
+
+// ---- formatos por hoja (ancho + money cols + alineación)
+function setMoneyCols(colsIdx){
   for (let r = 1; r < totalRows; r++){
-    moneyCols.forEach(c=>{
+    colsIdx.forEach(c => {
       const addr = XLSX.utils.encode_cell({ r, c });
       if (!ws[addr]) return;
       ws[addr].z = '#,##0;[Red]-#,##0';
-      styleCell(addr, { alignment: { horizontal: "right", vertical: "center" } });
+      styleCell(addr, { alignment: { horizontal: "center", vertical: "center", wrapText: true } });
     });
   }
+}
 
-  // ---- color diferencia + estado SOLO en última fila (la recién agregada)
-  const lastRowIndex = current.length + 1; // fila real en Excel (header=1)
-  const difCell = `G${lastRowIndex}`; // Diferencia (col 7 -> G)
-  const estCell = `H${lastRowIndex}`; // Estado (col 8 -> H)
+// Anchos por hoja (ajustado para que “entre todo”)
+if (sheetName === "GiftCards") {
+  ws["!cols"] = [
+    { wch: 20 }, // Fecha
+    { wch: 16 }, // Codigo
+    { wch: 24 }, // Cliente
+    { wch: 14 }, // DNI
+    { wch: 16 }, // Telefono
+    { wch: 14 }, // Tipo
+    { wch: 12 }, // Monto
+    { wch: 16 }, // SaldoResultante
+    { wch: 34 }  // Obs (más grande para “Medio: EFECTIVO…”)
+  ];
+  setMoneyCols([6, 7]); // Monto, SaldoResultante
+} else if (sheetName === "Cambios") {
+  // (tus anchos, pero con Obs un poco más)
+  ws["!cols"] = [
+    { wch: 20 }, { wch: 14 },
+    { wch: 22 }, { wch: 12 }, { wch: 10 },
+    { wch: 14 }, { wch: 14 },
+    { wch: 22 }, { wch: 12 }, { wch: 10 },
+    { wch: 14 }, { wch: 14 },
+    { wch: 12 }, { wch: 16 }, { wch: 34 }
+  ];
+  // money cols: PrecioDevUnit(5), TotalDev(6), PrecioNewUnit(10), TotalNew(11), Diferencia(12)
+  setMoneyCols([5, 6, 10, 11, 12]);
+} else if (sheetName === "CuentaCorriente") {
+  ws["!cols"] = [
+    { wch: 20 }, { wch: 26 }, { wch: 14 },
+    { wch: 16 }, { wch: 24 }, { wch: 14 },
+    { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 34 }
+  ];
+  // money cols: Monto(6), SaldoPosterior(7)
+  setMoneyCols([6, 7]);
+} else if (sheetName === "Ventas") {
+  // dejalo como ya lo tenías
+} else if (sheetName === "Cierres") {
+  // dejalo como ya lo tenías
+}
 
-  const dif = Number(rowObj.Diferencia || 0);
-  const ok = dif >= 0;
-
-  const green = { patternType: "solid", fgColor: { rgb: "DCFCE7" } };
-  const red   = { patternType: "solid", fgColor: { rgb: "FEE2E2" } };
-
-  styleCell(difCell, { fill: ok ? green : red, font: { bold: true } });
-  styleCell(estCell, { fill: ok ? green : red, font: { bold: true } });
-
-  // ---- freeze header + filtro
-  ws["!freeze"] = { xSplit: 0, ySplit: 1 };
-  ws["!autofilter"] = { ref: `A1:I${totalRows}` };
-
-  XLSX.writeFile(wb, filePath);
+XLSX.writeFile(wb, filePath);
 }
 
 function monthDirFromISO(isoDate){
@@ -338,6 +386,14 @@ function monthDirFromISO(isoDate){
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   return path.join(BASE_REG_DIR, `${y}-${m}`); // ej: registros/cajas/2026-02
+}
+
+const BASE_OPER_DIR = path.join(process.cwd(), "registros", "operaciones");
+
+function operacionesXlsxPathFromISO(isoDate){
+  const ym = yyyymmFromISO(isoDate); // (ya lo tenés en tu server)
+  ensureDir(BASE_OPER_DIR);
+  return path.join(BASE_OPER_DIR, `operaciones-${ym}.xlsx`);
 }
 
 app.post("/api/registrar-cierre-caja", (req, res) => {
@@ -362,7 +418,16 @@ app.post("/api/registrar-cierre-caja", (req, res) => {
     const header = ["Fecha", "Turno", "Usuario", "Apertura", "Cierre", "Esperado", "Diferencia", "Estado", "Observación"];
 
     const row = {
-      Fecha: new Date(fecha).toLocaleString("es-AR"),
+     Fecha: new Date(fecha).toLocaleString("es-AR", {
+  timeZone: "America/Argentina/Buenos_Aires",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false
+}),
       Turno: cajaId,
       Usuario: String(payload.usuario || "—"),
       Apertura: apertura,
@@ -489,7 +554,10 @@ const ventaId = "V-" + String(nuevoNumero).padStart(8, "0");
     ];
 
     const row = {
-      Fecha: new Date(fechaISO).toLocaleString("es-AR"),
+      Fecha: new Date(fechaISO).toLocaleString("es-AR", {
+        timeZone: "America/Argentina/Buenos_Aires",
+        hour12: false
+      }),
       ID: ventaId,
       Vendedor: safeStr(venta.vendedor || "—"),
       Cliente: safeStr(venta.cliente || "—"),
@@ -607,6 +675,134 @@ app.post("/api/enviar-recibo-pdf", async (req, res) => {
   } catch (e) {
     console.error("Enviar-recibo-pdf ERROR:", e);
     return res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
+});
+
+app.post("/api/operaciones/cambio", (req, res) => {
+  try {
+    const d = req.body || {};
+    const fechaISO = d.fecha || new Date().toISOString();
+    const xlsxPath = operacionesXlsxPathFromISO(fechaISO);
+
+    const header = [
+      "Fecha","Tipo",
+      "ProdDev","TalleDev","CantDev","PrecioDevUnit","TotalDev",
+      "ProdNew","TalleNew","CantNew","PrecioNewUnit","TotalNew",
+      "Diferencia","Resolucion","Obs"
+    ];
+
+    const cantDev = Number(d.cantDev || 0);
+    const cantNew = Number(d.cantNew || 0);
+    const precioDevUnit = Number(d.precioDevUnit || 0);
+    const precioNewUnit = Number(d.precioNewUnit || 0);
+    const totalDev = Number(d.totalDev ?? (cantDev * precioDevUnit));
+    const totalNew = Number(d.totalNew ?? (cantNew * precioNewUnit));
+    const diferencia = Number(d.diferencia ?? (totalNew - totalDev));
+
+    const row = {
+      Fecha: new Date(fechaISO).toLocaleString("es-AR"),
+      Tipo: String(d.tipo || ""), // CAMBIO / DEVOLUCION
+      ProdDev: String(d.prodDev || ""),
+      TalleDev: String(d.talleDev || ""),
+      CantDev: cantDev,
+      PrecioDevUnit: precioDevUnit,
+      TotalDev: totalDev,
+      ProdNew: String(d.prodNew || ""),
+      TalleNew: String(d.talleNew || ""),
+      CantNew: cantNew,
+      PrecioNewUnit: precioNewUnit,
+      TotalNew: totalNew,
+      Diferencia: diferencia,
+      Resolucion: String(d.resolucion || ""), // EFECTIVO / GIFT_CARD / CC / OTRO
+      Obs: String(d.obs || "")
+    };
+
+    appendRowToXlsx(xlsxPath, "Cambios", header, row);
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false });
+  }
+});
+
+app.post("/api/operaciones/giftcard", (req, res) => {
+  try {
+    const d = req.body || {};
+    const fechaISO = d.fecha || new Date().toISOString();
+    const xlsxPath = operacionesXlsxPathFromISO(fechaISO);
+
+    const header = [
+      "Fecha","Codigo","Cliente","DNI","Telefono",
+      "Tipo","Monto","SaldoResultante","Obs"
+    ];
+
+    const row = {
+      Fecha: new Date(fechaISO).toLocaleString("es-AR"),
+      Codigo: String(d.codigo || ""),
+      Cliente: String(d.cliente || ""),
+      DNI: String(d.dni || ""),
+      Telefono: String(d.telefono || ""),
+      Tipo: String(d.tipo || ""), // EMITIDA / USADA / AJUSTE
+      Monto: Number(d.monto || 0),
+      SaldoResultante: Number(d.saldo || 0),
+      Obs: String(d.obs || "")
+    };
+
+    appendRowToXlsx(xlsxPath, "GiftCards", header, row);
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false });
+  }
+});
+
+app.post("/api/operaciones/cuenta-corriente", (req, res) => {
+  try {
+    const d = req.body || {};
+    const fechaISO = d.fecha || new Date().toISOString();
+    const xlsxPath = operacionesXlsxPathFromISO(fechaISO);
+
+    const header = [
+      "Fecha","Cliente","DNI","Telefono","Email",
+      "Tipo","Monto","SaldoPosterior","Ref","Obs"
+    ];
+
+    const row = {
+      Fecha: new Date(fechaISO).toLocaleString("es-AR"),
+      Cliente: String(d.cliente || ""),
+      DNI: String(d.dni || ""),
+      Telefono: String(d.telefono || ""),
+      Email: String(d.email || ""),
+      Tipo: String(d.tipo || ""), // VENTA / PAGO / AJUSTE
+      Monto: Number(d.monto || 0),
+      SaldoPosterior: Number(d.saldo || 0),
+      Ref: String(d.ref || ""),   // ej: ID venta / recibo / lo que quieras
+      Obs: String(d.obs || "")
+    };
+
+    appendRowToXlsx(xlsxPath, "CuentaCorriente", header, row);
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false });
+  }
+});
+
+app.get("/api/operaciones/excel", (req, res) => {
+  try {
+    const ym = yyyymmFromISO(new Date().toISOString());
+    const filePath = path.join(BASE_OPER_DIR, `operaciones-${ym}.xlsx`);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ ok:false, error:"No hay operaciones registradas este mes." });
+    }
+
+    res.setHeader("Content-Type","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `inline; filename="operaciones-${ym}.xlsx"`);
+    return res.sendFile(filePath);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok:false });
   }
 });
 
